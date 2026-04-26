@@ -56,6 +56,29 @@ jobs:
           cp en/GLOSSARY.md docs/en/GLOSSARY.md
           cp -r en/chapters/. docs/en/chapters/
 
+      - name: Insert blank line before lazy bullet lists (GitHub-style)
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          BULLET = re.compile(r'^\s*-\s')
+          LIST_LIKE = re.compile(r'^\s*(?:-|\d+\.)\s')
+          for p in pathlib.Path('docs').rglob('*.md'):
+              lines = p.read_text().split('\n')
+              out = []
+              in_fence = False
+              for line in lines:
+                  stripped = line.lstrip()
+                  if stripped.startswith('```') or stripped.startswith('~~~'):
+                      in_fence = not in_fence
+                  elif (not in_fence
+                        and BULLET.match(line)
+                        and out and out[-1].strip()
+                        and not LIST_LIKE.match(out[-1])):
+                      out.append('')
+                  out.append(line)
+              p.write_text('\n'.join(out))
+          EOF
+
       - name: Build site
         run: mkdocs build --site-dir _site
 
