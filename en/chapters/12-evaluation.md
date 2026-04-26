@@ -1,5 +1,7 @@
 [← Previous Chapter](11-agents.md) | [Table of Contents](../README.md) | [Next Chapter →](13-interpretability.md)
 
+**中文**: [中文](../../chapters/12-evaluation.md)
+
 # Chapter 12: Evaluation -- The Most Underestimated Link
 
 > "If you can't measure it, you can't improve it. If you don't measure it, you'll definitely break it."

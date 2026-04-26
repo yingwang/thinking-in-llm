@@ -1,5 +1,7 @@
 [← Previous Chapter](02-attention.md) | [Table of Contents](../README.md) | [Next Chapter →](04-alignment.md)
 
+**中文**: [中文](../../chapters/03-scaling.md)
+
 # Chapter 3: Emergence from Scale
 
 > "The unreasonable effectiveness of scale."

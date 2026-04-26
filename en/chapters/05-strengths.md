@@ -1,5 +1,7 @@
 [← Previous Chapter](04-alignment.md) | [Table of Contents](../README.md) | [Next Chapter →](06-limitations.md)
 
+**中文**: [中文](../../chapters/05-strengths.md)
+
 # Chapter 5: What LLMs Are Truly Good At
 
 > "Know thy tool." -- Every engineer should know the situations where the tool in their hands is sharpest.

@@ -1,5 +1,7 @@
 [← Previous Chapter](14-multimodal.md) | [Table of Contents](../README.md)
 
+**中文**: [中文](../../chapters/15-future.md)
+
 # Chapter 15: The Future of LLMs
 
 > "Predictions are hard, especially about the future. Predictions about a field that doubles every six months are nearly worthless." — paraphrased

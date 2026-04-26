@@ -1,5 +1,7 @@
 [目录](../README.md) | [下一章 →](02-attention.md)
 
+**English**: [English](../en/chapters/01-next-token.md)
+
 # 第一章：一切都是续写
 
 > "The next token prediction objective is the most important idea in AI."

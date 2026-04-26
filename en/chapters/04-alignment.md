@@ -1,5 +1,7 @@
 [← Previous Chapter](03-scaling.md) | [Table of Contents](../README.md) | [Next Chapter →](05-strengths.md)
 
+**中文**: [中文](../../chapters/04-alignment.md)
+
 # Chapter 4: From Pretraining to Alignment
 
 > "The base model is a shoggoth. Alignment is the smiley face on top."

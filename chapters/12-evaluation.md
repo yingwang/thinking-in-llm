@@ -1,5 +1,7 @@
 [← 上一章](11-agents.md) | [目录](../README.md) | [下一章 →](13-interpretability.md)
 
+**English**: [English](../en/chapters/12-evaluation.md)
+
 # 第十二章：评估——最被低估的环节
 
 > "If you can't measure it, you can't improve it. If you don't measure it, you'll definitely break it."

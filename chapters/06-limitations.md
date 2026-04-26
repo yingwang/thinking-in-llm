@@ -1,5 +1,7 @@
 [← 上一章](05-strengths.md) | [目录](../README.md) | [下一章 →](07-hallucination.md)
 
+**English**: [English](../en/chapters/06-limitations.md)
+
 # 第六章：LLM 的硬伤
 
 > "It's not a bug, it's a ~~feature~~ fundamental architectural limitation."

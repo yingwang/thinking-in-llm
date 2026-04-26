@@ -1,5 +1,7 @@
 [← 上一章](02-attention.md) | [目录](../README.md) | [下一章 →](04-alignment.md)
 
+**English**: [English](../en/chapters/03-scaling.md)
+
 # 第三章：规模涌现
 
 > "The unreasonable effectiveness of scale."

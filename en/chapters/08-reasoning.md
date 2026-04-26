@@ -1,5 +1,7 @@
 [← Previous Chapter](07-hallucination.md) | [Table of Contents](../README.md) | [Next Chapter →](09-prompting.md)
 
+**中文**: [中文](../../chapters/08-reasoning.md)
+
 # Chapter 8: Reasoning or Imitation?
 
 > "Asked to think step by step, the model writes down what 'thinking step by step' looks like — and gets the right answer more often. We don't fully understand why."

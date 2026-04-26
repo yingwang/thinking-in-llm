@@ -1,5 +1,7 @@
 [← 上一章](06-limitations.md) | [目录](../README.md) | [下一章 →](08-reasoning.md)
 
+**English**: [English](../en/chapters/07-hallucination.md)
+
 # 第七章：幻觉的本质
 
 > "The model is bullshitting. Not lying, not mistaken — bullshitting in the technical sense: producing language without regard for truth."

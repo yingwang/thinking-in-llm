@@ -1,5 +1,7 @@
 [← 上一章](12-evaluation.md) | [目录](../README.md) | [下一章 →](14-multimodal.md)
 
+**English**: [English](../en/chapters/13-interpretability.md)
+
 # 第十三章：Interpretability——打开黑箱
 
 > "The goal of mechanistic interpretability is to reverse-engineer the algorithms learned by neural networks."

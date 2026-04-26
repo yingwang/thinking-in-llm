@@ -1,5 +1,7 @@
 [← Previous Chapter](08-reasoning.md) | [Table of Contents](../README.md) | [Next Chapter →](10-knowledge.md)
 
+**中文**: [中文](../../chapters/09-prompting.md)
+
 # Chapter 9: Prompt Is Programming
 
 > "The hottest new programming language is English."

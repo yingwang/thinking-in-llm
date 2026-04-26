@@ -1,5 +1,7 @@
 [← Previous Chapter](13-interpretability.md) | [Table of Contents](../README.md) | [Next Chapter →](15-future.md)
 
+**中文**: [中文](../../chapters/14-multimodal.md)
+
 # Chapter 14: Multimodality: Beyond Text
 
 > "Once you tokenize it, it's text. The question is just what counts as 'it'."

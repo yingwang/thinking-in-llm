@@ -1,5 +1,7 @@
 [← 上一章](04-alignment.md) | [目录](../README.md) | [下一章 →](06-limitations.md)
 
+**English**: [English](../en/chapters/05-strengths.md)
+
 # 第五章：LLM 真正擅长什么
 
 > "Know thy tool." —— 每个工程师都应该知道自己手里的工具在什么场景下最锋利。

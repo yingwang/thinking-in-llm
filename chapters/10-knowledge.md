@@ -1,5 +1,7 @@
 [← 上一章](09-prompting.md) | [目录](../README.md) | [下一章 →](11-agents.md)
 
+**English**: [English](../en/chapters/10-knowledge.md)
+
 # 第十章：知识注入的三条路
 
 > "An LLM without external knowledge is like a brilliant person with amnesia — great at thinking, terrible at remembering."

@@ -1,5 +1,7 @@
 [← 上一章](13-interpretability.md) | [目录](../README.md) | [下一章 →](15-future.md)
 
+**English**: [English](../en/chapters/14-multimodal.md)
+
 # 第十四章：多模态——超越文本
 
 > "Once you tokenize it, it's text. The question is just what counts as 'it'."

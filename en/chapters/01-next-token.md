@@ -1,5 +1,7 @@
 [Table of Contents](../README.md) | [Next Chapter →](02-attention.md)
 
+**中文**: [中文](../../chapters/01-next-token.md)
+
 # Chapter 1: Everything Is Continuation
 
 > "The next token prediction objective is the most important idea in AI."

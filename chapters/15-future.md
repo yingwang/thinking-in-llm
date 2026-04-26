@@ -1,5 +1,7 @@
 [← 上一章](14-multimodal.md) | [目录](../README.md)
 
+**English**: [English](../en/chapters/15-future.md)
+
 # 第十五章：LLM 的未来
 
 > "Predictions are hard, especially about the future. Predictions about a field that doubles every six months are nearly worthless." — paraphrased

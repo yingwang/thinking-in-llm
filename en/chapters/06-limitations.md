@@ -1,5 +1,7 @@
 [← Previous Chapter](05-strengths.md) | [Table of Contents](../README.md) | [Next Chapter →](07-hallucination.md)
 
+**中文**: [中文](../../chapters/06-limitations.md)
+
 # Chapter 6: The Hard Limits of LLMs
 
 > "It's not a bug, it's a ~~feature~~ fundamental architectural limitation."

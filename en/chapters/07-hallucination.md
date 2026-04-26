@@ -1,5 +1,7 @@
 [← Previous Chapter](06-limitations.md) | [Table of Contents](../README.md) | [Next Chapter →](08-reasoning.md)
 
+**中文**: [中文](../../chapters/07-hallucination.md)
+
 # Chapter 7: The Nature of Hallucination
 
 > "The model is bullshitting. Not lying, not mistaken — bullshitting in the technical sense: producing language without regard for truth."

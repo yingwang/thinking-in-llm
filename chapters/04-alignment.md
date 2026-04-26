@@ -1,4 +1,6 @@
-[← 上一章](03-scaling.md) | [目录](../README.md) | [下一章 →](05-inference.md)
+[← 上一章](03-scaling.md) | [目录](../README.md) | [下一章 →](05-strengths.md)
+
+**English**: [English](../en/chapters/04-alignment.md)
 
 # 第四章：从预训练到对齐
 

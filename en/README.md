@@ -2,7 +2,9 @@
 
 > Starting from the essence of next-token prediction, understand the thinking mechanism of LLMs and master the first principles for building LLM systems.
 
-**Chinese version**: [Thinking in LLM](../README.md)
+**Languages**: [中文](../README.md) | [English](README.md)
+
+**Glossary**: [English terminology](GLOSSARY.md)
 
 For engineers who have a programming background and are using, or want to use, LLMs to build products. No machine learning background is required.
 

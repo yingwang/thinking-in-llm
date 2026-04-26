@@ -1,5 +1,7 @@
 [← 上一章](08-reasoning.md) | [目录](../README.md) | [下一章 →](10-knowledge.md)
 
+**English**: [English](../en/chapters/09-prompting.md)
+
 # 第九章：Prompt 是编程
 
 > "The hottest new programming language is English."

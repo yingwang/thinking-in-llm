@@ -1,5 +1,7 @@
 [← 上一章](10-knowledge.md) | [目录](../README.md) | [下一章 →](12-evaluation.md)
 
+**English**: [English](../en/chapters/11-agents.md)
+
 # 第十一章：Agent 的第一性原理
 
 > "An agent is just a while loop with a tool call." — 大半实战的真相，但也只有一半。

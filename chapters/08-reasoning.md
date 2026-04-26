@@ -1,5 +1,7 @@
 [← 上一章](07-hallucination.md) | [目录](../README.md) | [下一章 →](09-prompting.md)
 
+**English**: [English](../en/chapters/08-reasoning.md)
+
 # 第八章：推理还是模仿？
 
 > "Asked to think step by step, the model writes down what 'thinking step by step' looks like — and gets the right answer more often. We don't fully understand why."

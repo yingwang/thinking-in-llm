@@ -1,5 +1,7 @@
 [← Previous Chapter](10-knowledge.md) | [Table of Contents](../README.md) | [Next Chapter →](12-evaluation.md)
 
+**中文**: [中文](../../chapters/11-agents.md)
+
 # Chapter 11: First Principles of Agents
 
 > "An agent is just a while loop with a tool call." - This is most of the truth in practice, but also only half of it.

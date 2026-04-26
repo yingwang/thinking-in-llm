@@ -1,5 +1,7 @@
 [← 上一章](01-next-token.md) | [目录](../README.md) | [下一章 →](03-scaling.md)
 
+**English**: [English](../en/chapters/02-attention.md)
+
 # 第二章：Attention 是信息路由
 
 > "Attention is all you need."

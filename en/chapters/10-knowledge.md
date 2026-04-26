@@ -1,5 +1,7 @@
 [← Previous Chapter](09-prompting.md) | [Table of Contents](../README.md) | [Next Chapter →](11-agents.md)
 
+**中文**: [中文](../../chapters/10-knowledge.md)
+
 # Chapter 10: Three Paths for Knowledge Injection
 
 > "An LLM without external knowledge is like a brilliant person with amnesia — great at thinking, terrible at remembering."

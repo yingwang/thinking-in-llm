@@ -1,5 +1,7 @@
 [← Previous Chapter](01-next-token.md) | [Table of Contents](../README.md) | [Next Chapter →](03-scaling.md)
 
+**中文**: [中文](../../chapters/02-attention.md)
+
 # Chapter 2: Attention Is Information Routing
 
 > "Attention is all you need."
