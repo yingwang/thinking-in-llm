@@ -48,6 +48,9 @@ flowchart LR
 
     P1 --> P2 --> P3 --> P4
 
+    classDef chapter fill:#ffffff,stroke:#555,color:#222
+    class C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14,C15 chapter
+
     style P1 fill:#e8eaf6,stroke:#3949ab,color:#1a237e
     style P2 fill:#fff3e0,stroke:#e65100,color:#bf360c
     style P3 fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
