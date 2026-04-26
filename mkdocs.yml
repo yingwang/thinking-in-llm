@@ -1,0 +1,141 @@
+site_name: Thinking in LLM
+site_description: 从 next-token prediction 的本质出发，理解 LLM 的思维机制 / Understand LLM thinking from the first principle of next-token prediction.
+site_url: https://yingwang.github.io/thinking-in-llm/
+repo_url: https://github.com/yingwang/thinking-in-llm
+repo_name: yingwang/thinking-in-llm
+edit_uri: edit/main/
+
+docs_dir: docs
+site_dir: _site
+use_directory_urls: true
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.indexes
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.progress
+    - toc.follow
+    - search.highlight
+    - search.share
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yingwang
+  alternate:
+    - name: 中文
+      link: /thinking-in-llm/
+      lang: zh
+    - name: English
+      link: /thinking-in-llm/en/
+      lang: en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+  - mdx_truly_sane_lists
+  - toc:
+      permalink: true
+      permalink_title: 链接到此节
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search:
+      lang:
+        - en
+        - zh
+
+nav:
+  - 中文:
+    - 首页: README.md
+    - 大纲: OUTLINE.md
+    - 第 1 章 — 一切都是续写: chapters/01-next-token.md
+    - 第 2 章 — Attention 是信息路由: chapters/02-attention.md
+    - 第 3 章 — 规模涌现: chapters/03-scaling.md
+    - 第 4 章 — 从预训练到对齐: chapters/04-alignment.md
+    - 第 5 章 — 真正擅长什么: chapters/05-strengths.md
+    - 第 6 章 — 硬伤: chapters/06-limitations.md
+    - 第 7 章 — 幻觉的本质: chapters/07-hallucination.md
+    - 第 8 章 — 推理还是模仿: chapters/08-reasoning.md
+    - 第 9 章 — Prompt 是编程: chapters/09-prompting.md
+    - 第 10 章 — 知识注入: chapters/10-knowledge.md
+    - 第 11 章 — Agent: chapters/11-agents.md
+    - 第 12 章 — 评估: chapters/12-evaluation.md
+    - 第 13 章 — 可解释性: chapters/13-interpretability.md
+    - 第 14 章 — 多模态: chapters/14-multimodal.md
+    - 第 15 章 — 未来: chapters/15-future.md
+  - English:
+    - Home: en/README.md
+    - Outline: en/OUTLINE.md
+    - Glossary: en/GLOSSARY.md
+    - Ch. 1 — Everything Is Continuation: en/chapters/01-next-token.md
+    - Ch. 2 — Attention as Information Routing: en/chapters/02-attention.md
+    - Ch. 3 — Emergence at Scale: en/chapters/03-scaling.md
+    - Ch. 4 — From Pretraining to Alignment: en/chapters/04-alignment.md
+    - Ch. 5 — What LLMs Are Good At: en/chapters/05-strengths.md
+    - Ch. 6 — Hard Limitations: en/chapters/06-limitations.md
+    - Ch. 7 — The Nature of Hallucination: en/chapters/07-hallucination.md
+    - Ch. 8 — Reasoning or Mimicry: en/chapters/08-reasoning.md
+    - Ch. 9 — Prompting Is Programming: en/chapters/09-prompting.md
+    - Ch. 10 — Knowledge Injection: en/chapters/10-knowledge.md
+    - Ch. 11 — Agents: en/chapters/11-agents.md
+    - Ch. 12 — Evaluation: en/chapters/12-evaluation.md
+    - Ch. 13 — Interpretability: en/chapters/13-interpretability.md
+    - Ch. 14 — Multimodal: en/chapters/14-multimodal.md
+    - Ch. 15 — Future: en/chapters/15-future.md
+
+copyright: |
+  Copyright &copy; 2026 Ying Wang —
+  <a href="https://github.com/yingwang/thinking-in-llm/blob/main/LICENSE">CC BY-NC-SA 4.0</a>
