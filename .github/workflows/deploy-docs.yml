@@ -58,11 +58,10 @@ jobs:
           cp javascripts/mathjax.js docs/javascripts/mathjax.js
           cp stylesheets/extra.css docs/stylesheets/extra.css
 
-      - name: Insert blank line before lazy bullet lists (GitHub-style)
+      - name: Insert blank line before lazy lists (GitHub-style)
         run: |
           python3 - <<'EOF'
           import re, pathlib
-          BULLET = re.compile(r'^\s*-\s')
           LIST_LIKE = re.compile(r'^\s*(?:-|\d+\.)\s')
           for p in pathlib.Path('docs').rglob('*.md'):
               lines = p.read_text().split('\n')
@@ -73,7 +72,7 @@ jobs:
                   if stripped.startswith('```') or stripped.startswith('~~~'):
                       in_fence = not in_fence
                   elif (not in_fence
-                        and BULLET.match(line)
+                        and LIST_LIKE.match(line)
                         and out and out[-1].strip()
                         and not LIST_LIKE.match(out[-1])):
                       out.append('')

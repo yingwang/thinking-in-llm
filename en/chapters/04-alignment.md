@@ -19,7 +19,7 @@ This is the book's most practically valuable chapter. Understanding alignment me
 
 ### A Continuation Engine Is Not an Assistant
 
-Recall Chapter 1: what a base model does is estimate $P(\text{next\_token} | \text{context})$. It does not know that you are "asking a question," and it does not know that it should "answer." It only knows how to continue text.
+Recall Chapter 1: what a base model does is estimate $P(\text{next-token} \mid \text{context})$. It does not know that you are "asking a question," and it does not know that it should "answer." It only knows how to continue text.
 
 ```
 # Typical behavior of a base model
@@ -39,6 +39,7 @@ My wife and I moved here after..."
 ```
 
 The problem with a base model is not that it is "not smart enough," but that:
+
 1. **It does not know what role it should play**
 2. **It has no judgment about harmful content**: whatever exists in the training data, it can generate
 3. **It does not know the format for "answering questions"**: it only knows how to continue text
