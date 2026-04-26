@@ -1,0 +1,12 @@
+/* Tighter, GitHub-like typography */
+.md-typeset {
+  font-size: 0.75rem;        /* was 0.8rem ≈ 16px → ~15px */
+  line-height: 1.55;
+}
+
+.md-typeset h1 { font-size: 1.65em; font-weight: 600; }
+.md-typeset h2 { font-size: 1.35em; font-weight: 600; margin-top: 1.6em; }
+.md-typeset h3 { font-size: 1.15em; font-weight: 600; }
+.md-typeset h4 { font-size: 1em;    font-weight: 600; }
+
+.md-typeset code { font-size: 0.85em; }

@@ -3,6 +3,7 @@
 > A first-principles guide to how LLMs "think," starting from next-token prediction and ending with practical system design.
 
 **Languages**: [中文](../README.md) | [English](README.md)
+**Read online**: [yingwang.github.io/thinking-in-llm](https://yingwang.github.io/thinking-in-llm/) (search, dark mode, sidebar TOC)
 
 **Glossary**: [English terminology](GLOSSARY.md)
 

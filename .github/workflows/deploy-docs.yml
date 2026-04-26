@@ -47,7 +47,7 @@ jobs:
 
       - name: Assemble docs/ from chapters/ + en/
         run: |
-          mkdir -p docs/chapters docs/en/chapters docs/javascripts
+          mkdir -p docs/chapters docs/en/chapters docs/javascripts docs/stylesheets
           cp README.md docs/README.md
           cp OUTLINE.md docs/OUTLINE.md
           cp -r chapters/. docs/chapters/
@@ -56,6 +56,7 @@ jobs:
           cp en/GLOSSARY.md docs/en/GLOSSARY.md
           cp -r en/chapters/. docs/en/chapters/
           cp javascripts/mathjax.js docs/javascripts/mathjax.js
+          cp stylesheets/extra.css docs/stylesheets/extra.css
 
       - name: Insert blank line before lazy bullet lists (GitHub-style)
         run: |
