@@ -381,7 +381,7 @@ The most reliable countermeasure is still the principle from Chapter 6: **let th
 
 For the handshake problem above, the right approach is not to make the model "calculate more carefully", but to have it translate the problem into code:
 
-```python
+````python
 prompt = f"""
 Please translate the following math problem into Python code and output the final answer.
 
@@ -392,7 +392,7 @@ Question: {question}
 ```
 """
 # Then execute the code with a code interpreter
-```
+````
 
 This cuts the reasoning chain into two segments: the model is responsible for "understanding the problem → writing the formula", and the code is responsible for "calculating the value." The window for error accumulation is greatly shortened.
 

@@ -678,7 +678,7 @@ translation:
 
 ### V4：生产级别——加入防御性措施
 
-```python
+````python
 SYSTEM_PROMPT = """你是一个客户邮件分析系统。你的输出将被程序直接解析，必须是严格合法的 JSON。
 
 ## 输出 Schema
@@ -738,7 +738,7 @@ def analyze_email(email_content: str) -> dict:
     assert result["urgency"] in ["high", "medium", "low"]
     
     return result
-```
+````
 
 **V4 的进一步改进**：
 1. **JSON mode 强制**：`response_format={"type": "json_object"}`

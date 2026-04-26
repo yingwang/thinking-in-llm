@@ -678,7 +678,7 @@ Output:
 
 ### V4: Production Level, with Defensive Measures
 
-```python
+````python
 SYSTEM_PROMPT = """You are a customer email analysis system. Your output will be parsed directly by a program and must be strictly valid JSON.
 
 ## Output Schema
@@ -738,7 +738,7 @@ def analyze_email(email_content: str) -> dict:
     assert result["urgency"] in ["high", "medium", "low"]
 
     return result
-```
+````
 
 **Further improvements in V4**:
 1. **JSON mode enforcement**: `response_format={"type": "json_object"}`
