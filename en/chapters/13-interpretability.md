@@ -7,11 +7,11 @@
 > "The goal of mechanistic interpretability is to reverse-engineer the algorithms learned by neural networks."
 > — Chris Olah
 
-In the previous twelve chapters, we have been working on the **outside** of models: designing prompts, building RAG, constructing agents, and doing evaluation. We have treated LLMs as black boxes: text in, text out, without caring what happens in between.
+In the previous twelve chapters, we worked on the **outside** of models: designing prompts, building RAG, constructing agents, and running evaluations. We treated LLMs as black boxes — text in, text out — without caring what happens in between.
 
-But if you want to use an LLM for medical diagnosis, legal judgment, financial decisions, or any scenario where errors have serious consequences, "it works but we don't know why" is no longer acceptable.
+But if you want to use an LLM for medical diagnosis, legal judgment, financial decisions, or any scenario where errors carry serious consequences, "it works but we don't know why" is no longer acceptable.
 
-In this chapter, we will open the black box and look at what is really happening inside.
+This chapter opens the black box and looks at what is really happening inside.
 
 ---
 
@@ -19,13 +19,13 @@ In this chapter, we will open the black box and look at what is really happening
 
 ### The Limits of "As Long as It Works"
 
-Most engineers are not interested in model internals. This is reasonable: you do not need to understand every optimization in the V8 engine to write good JavaScript. But LLMs have a fundamental difference from traditional software: **the behavior of traditional software is explicitly programmed, while the behavior of LLMs emerges from data**.
+Most engineers have no interest in model internals. This is reasonable — you do not need to understand every optimization in V8 to write good JavaScript. But LLMs differ fundamentally from traditional software: **traditional software behavior is explicitly programmed; LLM behavior emerges from data**.
 
 This means:
 
-- **You cannot verify a model's behavior through code review**. The model's "code" is tens of billions of floating-point numbers, which humans cannot read.
-- **You cannot write complete test cases**. The model's input space is infinite, and any finite test set covers only a tiny corner of it.
-- **You cannot guarantee the model will not produce dangerous outputs on certain inputs**. Unlike traditional software, formal verification is not available.
+- **You cannot verify behavior through code review**. The model's "code" is tens of billions of floating-point numbers, unreadable by humans.
+- **You cannot write complete test cases**. The input space is infinite; any finite test set covers only a tiny corner.
+- **You cannot guarantee safe outputs on all inputs**. Unlike traditional software, formal verification is not available.
 
 ### Four Motivations for Interpretability
 
@@ -43,19 +43,19 @@ graph TB
     D --> D1["What exactly have neural networks learned?<br/>How do they represent knowledge?"]
 ```
 
-1. **Debugging**. When a model outputs an error, you want to know why it was wrong: not just "it hallucinated", but which internal link had a problem. This is like a debugger in traditional software, letting you step through the model's "thinking process".
+1. **Debugging**. When a model outputs an error, you want to know why — not just "it hallucinated", but which internal component went wrong. Like a debugger in traditional software, interpretability lets you step through the model's "thinking process".
 
-2. **Safety**. If a model is used in a critical system, you need to ensure it will not produce harmful behavior under certain conditions. Black-box testing alone is not enough: you need to inspect whether there are "hidden-operation" circuits inside the model.
+2. **Safety**. If a model is deployed in a critical system, you need to ensure it will not produce harmful behavior under certain conditions. Black-box testing alone is not enough — you need to inspect whether "hidden-operation" circuits exist inside the model.
 
-3. **Trust**. The EU AI Act requires high-risk AI systems to be explainable. If you cannot explain why a model made a decision, you may be unable to deploy it under certain legal frameworks.
+3. **Trust**. The EU AI Act requires high-risk AI systems to be explainable. If you cannot explain why a model made a decision, you may not be able to deploy it under certain legal frameworks.
 
-4. **Scientific Understanding**. From a purely intellectual perspective, we have trained one of the most complex mathematical functions in human history, yet we know almost nothing about how it works internally. This is like inventing airplanes without understanding aerodynamics: they can fly, but we do not know why.
+4. **Scientific Understanding**. From a purely intellectual perspective, we have trained one of the most complex mathematical functions in human history, yet know almost nothing about how it works inside. This is like inventing airplanes without understanding aerodynamics — they fly, but we do not know why.
 
 ### The Scale of the Black-Box Problem
 
-A 70B-parameter model has 70 billion floating-point numbers. If you inspected one parameter per second, it would take 2,200 years to finish. More importantly, individual parameters are almost meaningless: meaning exists in the **combinatorial patterns** of parameters.
+A 70B-parameter model has 70 billion floating-point numbers. Inspecting one parameter per second would take 2,200 years. More importantly, individual parameters are nearly meaningless — meaning lives in the **combinatorial patterns** across parameters.
 
-This is the core challenge of interpretability research: how do we extract human-understandable structure from billions of numbers?
+This is the core challenge of interpretability: how do we extract human-understandable structure from billions of numbers?
 
 ---
 
@@ -63,7 +63,7 @@ This is the core challenge of interpretability research: how do we extract human
 
 ### Individual Neurons: Sometimes Interpretable, Often Not
 
-The most naive idea is that each neuron is responsible for one concept. This is like the "grandmother cell" found in the brain: a neuron that activates specifically when seeing one's grandmother.
+The most naive idea: each neuron is responsible for one concept. This resembles the "grandmother cell" hypothesis from neuroscience — a neuron that fires specifically when you see your grandmother.
 
 In early small networks, people did indeed find interpretable neurons:
 
@@ -85,15 +85,15 @@ def find_top_activating_texts(model, layer, neuron_idx, dataset):
 # Neuron #8091 activates when text contains quotation marks, mentions food, or discusses math -> ???
 ```
 
-The problem is that in large models, most neurons are **polysemantic**: a single neuron responds to multiple unrelated concepts. One neuron might activate for "cat", "the number 7", and "legal documents" at the same time. This is not a bug; it is **superposition**.
+The problem: in large models, most neurons are **polysemantic** — a single neuron responds to multiple unrelated concepts. One neuron might activate for "cat", "the number 7", and "legal documents" simultaneously. This is not a bug; it is **superposition**.
 
 ### Superposition: One Neuron Encodes Multiple Concepts
 
 > **Superposition**: A model encodes far more concepts than it has neurons in the neuron space, by allowing different concepts to share the same set of neurons.
 
-Why does superposition appear? Because the number of concepts the model needs to represent far exceeds the number of neurons.
+Why does superposition occur? Because the number of concepts the model needs to represent far exceeds the number of neurons.
 
-An intuitive analogy: imagine you have a 3-dimensional space (3 neurons), but need to represent 100 different directions (100 concepts). In 3D space, you can find at most 3 perfectly orthogonal directions. But if you allow a little overlap between directions (non-orthogonality), you can "pack" far more than 3 directions into this space.
+An intuitive analogy: imagine a 3-dimensional space (3 neurons) that needs to represent 100 directions (100 concepts). In 3D, you can find at most 3 perfectly orthogonal directions. But if you allow slight overlap between directions (non-orthogonality), you can pack far more than 3 directions into the same space.
 
 ```mermaid
 graph LR
@@ -118,18 +118,18 @@ graph LR
 
 ### The Compression Analogy
 
-Superposition is essentially a kind of **information compression**. Like file compression:
+Superposition is essentially **information compression**. Like file compression:
 
-- **No compression** (one-to-one): each concept has its own dedicated neuron. Required neurons = number of concepts. Simple but wasteful.
-- **Compression** (superposition): multiple concepts share the same set of neurons. The required number of neurons is far smaller than the number of concepts. Efficient but hard to interpret.
+- **No compression** (one-to-one): each concept gets its own neuron. Required neurons = number of concepts. Simple but wasteful.
+- **Compression** (superposition): multiple concepts share neurons. Required neurons far fewer than concepts. Efficient but hard to interpret.
 
 The key mathematical intuition comes from [Elhage et al. 2022, "Toy Models of Superposition"](https://transformer-circuits.pub/2022/toy_model/index.html):
 
-- If concepts are **sparse** (they do not appear at the same time), compression is more efficient
-- The higher the sparsity, the more concepts can be packed into the same space
-- This explains why LLMs can encode such a massive amount of knowledge in limited dimensions
+- If concepts are **sparse** (they rarely co-occur), compression is more efficient
+- Higher sparsity means more concepts can be packed into the same space
+- This explains why LLMs encode such a massive amount of knowledge in limited dimensions
 
-This paper proves that in a simple toy model, when features are sparse enough, the model naturally learns superposed representations, even without any explicit compression objective.
+This paper shows that in a simple toy model, when features are sparse enough, the model naturally learns superposed representations — even without an explicit compression objective.
 
 ---
 
@@ -137,19 +137,19 @@ This paper proves that in a simple toy model, when features are sparse enough, t
 
 ### Core Problem: How Do We Decompose Superposition?
 
-If superposition is the main obstacle to understanding models, the natural idea is: **find a way to separate the concepts that are stacked together**.
+If superposition is the main obstacle to understanding models, the natural idea is: **separate the concepts that are stacked together**.
 
 This is what Sparse Autoencoders (SAEs) do.
 
 ### Basic Idea
 
-The core intuition behind an SAE is very simple:
+The core intuition behind an SAE is simple:
 
 1. A certain layer of the model has a $d$-dimensional activation vector (for example, $d = 4096$)
 2. These $d$ dimensions contain far more than $d$ concepts (superposition)
-3. We train an SAE to map the $d$ dimensions into a space much larger than $d$ (for example, $d' = 131072$)
-4. Key constraint: this high-dimensional representation must be **sparse**: most dimensions are zero
-5. Then we map this sparse representation back to $d$ dimensions to reconstruct the original activation
+3. We train an SAE to map the $d$ dimensions into a much larger space (for example, $d' = 131072$)
+4. Key constraint: this high-dimensional representation must be **sparse** — most dimensions are zero
+5. Then we map the sparse representation back to $d$ dimensions to reconstruct the original activation
 
 ```mermaid
 graph LR
@@ -209,7 +209,7 @@ The two parts of the loss function reflect the two goals of an SAE:
 
 ### Breakthrough Results
 
-In 2023-2024, Anthropic's research team trained SAEs on large-scale language models and obtained exciting results.
+In 2023--2024, Anthropic's research team trained SAEs on large language models and obtained striking results.
 
 [Templeton et al. 2024, "Scaling Monosemanticity"](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) trained an SAE with millions of features on Claude 3 Sonnet and found many interpretable features:
 
@@ -223,13 +223,13 @@ In 2023-2024, Anthropic's research team trained SAEs on large-scale language mod
 | DNA sequences | Related to DNA sequences | "The ATCG pattern suggests..." |
 | Rosetta Stone | Rosetta Stone | "The trilingual inscription on the stone..." |
 
-These features were not labeled by humans: they were automatically separated by the SAE from model activations. The diversity of the features is impressive: from concrete entities (the Golden Gate Bridge) to abstract concepts (deception), from programming details (syntax errors) to scientific knowledge (DNA).
+These features were not labeled by humans — the SAE separated them automatically from model activations. The diversity is impressive: from concrete entities (the Golden Gate Bridge) to abstract concepts (deception), from programming details (syntax errors) to scientific knowledge (DNA).
 
 ### Why Is This a Breakthrough?
 
-Before SAEs, we had almost no way to answer the question "what is the model representing internally?" SAEs provide the first systematic method for decomposing a model's internal representations into human-understandable units.
+Before SAEs, there was almost no way to answer "what is the model representing internally?" SAEs provide the first systematic method for decomposing internal representations into human-understandable units.
 
-Analogy: if model activations are like a glass of mixed fruit juice, an SAE is like a separator that can restore the juice into its fruit components: apple juice, orange juice, grape juice. You can taste and understand each component separately.
+Analogy: if model activations are a glass of mixed fruit juice, an SAE is a separator that restores the juice into its components — apple, orange, grape. You can taste and understand each one separately.
 
 ---
 
@@ -237,15 +237,15 @@ Analogy: if model activations are like a glass of mixed fruit juice, an SAE is l
 
 ### From Features to Circuits
 
-SAEs tell us what the model is **representing**, but they do not tell us what the model is **computing**. To understand the computation process, we need to trace the paths through which information flows inside the model. These are **circuits**.
+SAEs tell us what the model **represents**, but not what it **computes**. To understand the computation, we need to trace the paths through which information flows inside the model. These paths are **circuits**.
 
 > **Circuit** = a path inside the model connecting multiple components (attention heads, MLP layers) that together implement a specific computational function.
 
-Just as electronic circuits are formed by connecting components such as resistors, capacitors, and transistors, neural network "circuits" are formed by connecting attention heads and MLP neurons.
+Just as electronic circuits connect resistors, capacitors, and transistors, neural network "circuits" connect attention heads and MLP neurons.
 
 ### Classic Case: Induction Heads
 
-[Olsson et al. 2022, "In-context Learning and Induction Heads"](https://arxiv.org/abs/2209.11895) discovered a circuit called an **induction head**, which implements a simple but critical algorithm: **pattern copying**.
+[Olsson et al. 2022, "In-context Learning and Induction Heads"](https://arxiv.org/abs/2209.11895) discovered a circuit called the **induction head**, which implements a simple but critical algorithm: **pattern copying**.
 
 ```
 Input sequence: ... Harry Potter is a wizard. Harry Potter is ...
@@ -267,7 +267,7 @@ This circuit is completed through the cooperation of two attention heads:
 1. **Previous token head**: attends to the position before the current token
 2. **Induction head**: uses the information from the first head to find the previously matching pattern and then copy it
 
-This is one of the clearest and most complete circuits discovered so far. It explains a core capability of LLMs: the foundational mechanism of in-context learning.
+This is one of the clearest and most complete circuits discovered so far. It explains a core LLM capability: the foundational mechanism of in-context learning.
 
 ### Another Case: Indirect Object Identification
 
@@ -312,9 +312,9 @@ def activation_patching(model, clean_input, corrupted_input, layer, position):
     return recovery
 ```
 
-Core idea: if replacing a component's activation can "repair" an incorrect output, then that component is a key part of the circuit. This is like repairing an electrical circuit: if replacing a bad component with a good one restores the circuit, the problem was in that component.
+Core idea: if replacing a component's activation "repairs" an incorrect output, that component is a key part of the circuit. Like repairing an electrical circuit — if swapping a bad component for a good one restores function, you have found the fault.
 
-**Path Patching** refines this further, tracing the specific paths through which information is passed between components. It has higher precision but also higher computational cost.
+**Path Patching** refines this further, tracing the specific paths through which information passes between components. Higher precision, but also higher computational cost.
 
 ### The Mechanistic Interpretability Research Agenda
 
@@ -322,7 +322,7 @@ Chris Olah and his team (first at OpenAI, later at Anthropic) proposed the long-
 
 > Goal: understand neural networks the way we understand compiler code: what every line of "code" (every neuron, every attention head) does, how data flows, and what the logic of the whole program is.
 
-Current progress is roughly equivalent to this: we can read some individual functions (specific circuits), but we are still far from understanding the whole program.
+Current progress: we can read some individual functions (specific circuits), but remain far from understanding the whole program.
 
 ---
 
@@ -330,13 +330,13 @@ Current progress is roughly equivalent to this: we can read some individual func
 
 ### From Understanding to Control
 
-If we can find features that represent specific concepts inside a model, a natural question is: **can we control the model's behavior by modifying those features?**
+If we can find features representing specific concepts inside a model, a natural question follows: **can we control the model's behavior by modifying those features?**
 
 The answer is: yes.
 
 ### Activation Addition: Giving the Model an "Injection"
 
-The simplest steering method is **activation addition**: during the model's forward pass, add a vector in a specific direction to the activation at a certain layer.
+The simplest steering method is **activation addition**: during the forward pass, add a direction vector to the activation at a specific layer.
 
 ```python
 # Pseudocode: activation addition
@@ -392,7 +392,7 @@ def get_contrast_vector(model, layer, positive_prompts, negative_prompts):
 
 ### Golden Gate Claude: A Classic Case
 
-In May 2024, Anthropic released a famous demo: **Golden Gate Claude**. They used an SAE to find the "Golden Gate Bridge" feature inside Claude 3 Sonnet, then forced the activation value of this feature to a very high number.
+In May 2024, Anthropic released a famous demo: **Golden Gate Claude**. They used an SAE to find the "Golden Gate Bridge" feature inside Claude 3 Sonnet, then forced this feature's activation to a very high value.
 
 The result was a Claude that was **extremely obsessed** with the Golden Gate Bridge:
 
@@ -408,7 +408,7 @@ systems, much like the Golden Gate Bridge connects San Francisco and
 Marin County, Python can bridge different data formats...
 ```
 
-Although this demo is funny, it conveys a profound point: **we can precisely control a model's behavior by modifying its internal representations, without modifying the prompt or retraining the model**.
+Although this demo is humorous, the point is profound: **we can precisely control a model's behavior by modifying internal representations, without changing the prompt or retraining**.
 
 ### Feature Steering vs Prompting
 
@@ -421,11 +421,11 @@ Although this demo is funny, it conveys a profound point: **we can precisely con
 | Flexibility | High (arbitrary text instructions) | Low (can only operate on discovered features) |
 | Deployment difficulty | Low (change API parameters) | High (requires modifying inference code) |
 
-Feature steering is a **complement** to prompting, not a replacement. In safety-critical scenarios that require precise control, it provides guarantees that prompting cannot provide.
+Feature steering **complements** prompting rather than replacing it. In safety-critical scenarios requiring precise control, it provides guarantees that prompting cannot.
 
 ### Clamping: Switch-Like Control
 
-A more extreme method than activation addition is **clamping**: force the activation value of a feature to zero (turn it off) or a very large value (force it on).
+A more extreme method is **clamping**: force a feature's activation to zero (off) or a very large value (on).
 
 ```python
 # Pseudocode: clamping SAE features
@@ -461,7 +461,7 @@ output = clamp_feature(model, sae, honesty_feature_idx, value=10.0,
 
 ### Core Idea
 
-Feature steering focuses on "controlling what the model does", while **probing** focuses on a more fundamental question: "what does the model know?"
+Feature steering focuses on controlling what the model does. **Probing** focuses on a more fundamental question: what does the model know?
 
 The method is simple:
 
@@ -509,27 +509,27 @@ probe = probe_for_property(
 
 ### Key Findings
 
-Probing research reveals that models hide far more information internally than their outputs show:
+Probing reveals that models encode far more information internally than their outputs show:
 
 **1. Syntactic structure**
 
-The middle layers of models can accurately encode the structure of syntax trees: which word modifies which word, subject-verb-object relationships, and so on. Surprisingly, nobody explicitly taught the model syntax; it learned it automatically from next-token prediction.
+Middle layers accurately encode syntax-tree structure: which word modifies which, subject-verb-object relationships, and so on. Surprisingly, nobody explicitly taught the model syntax — it learned automatically from next-token prediction.
 
 **2. World knowledge**
 
-Models do not only "know" facts at output time; their internal representations also encode these facts. For example, in the middle layers of a model, you can train a probe to predict the latitude and longitude coordinates of a city, even if the model has never output this information in coordinate form.
+Models do not only "know" facts at output time — their internal representations encode these facts too. For example, a probe trained on middle layers can predict a city's latitude and longitude, even if the model has never output coordinates.
 
 **3. Spatial relationships**
 
-Even more surprisingly, some studies have found that a model's internal representations can be linearly mapped to spatial coordinates. In other words, the model has not only memorized that "Paris is in France"; its representations also imply a kind of geospatial structure.
+Even more surprisingly, some studies find that internal representations can be linearly mapped to spatial coordinates. The model has not only memorized that "Paris is in France" — its representations also encode a kind of geospatial structure.
 
-### Othello-GPT: The Most Stunning Evidence
+### Othello-GPT: The Most Striking Evidence
 
-[Li et al. 2023, "Emergent World Representations"](https://arxiv.org/abs/2210.13382) did an excellent experiment:
+[Li et al. 2023, "Emergent World Representations"](https://arxiv.org/abs/2210.13382) ran a revealing experiment:
 
 1. Train a small GPT model to predict legal next moves in Othello
-2. The model's input contains only **move sequences** (such as "C4 D3 C3 E6..."), without any visual representation of the board
-3. Then use probing to test whether the model internally learned the board state
+2. The model's input contains only **move sequences** (e.g., "C4 D3 C3 E6..."), with no visual representation of the board
+3. Then use probing to test whether the model learned a board state internally
 
 Result: **the model did indeed learn a complete 8x8 board representation internally**.
 
@@ -550,7 +550,7 @@ Inside the model: it spontaneously learned the board state
 The probe can accurately predict whether each square is black, white, or empty from the model activations
 ```
 
-The significance of this finding: the model is not just doing surface pattern matching ("D3 usually comes after C4"). Internally, it builds a **world model**, an abstract representation of the board, and then predicts the next move based on this world model.
+The significance: the model is not just doing surface pattern matching ("D3 usually follows C4"). It builds a **world model** — an abstract board representation — and predicts the next move from that model.
 
 ### Limitations of Probing
 
@@ -561,7 +561,7 @@ High probing accuracy -> the model encodes this information ✓
 High probing accuracy -> the model uses this information during generation ✗ (not necessarily)
 ```
 
-The model may encode a certain property but choose to ignore it during actual generation. This is like knowing a fact but not remembering it when answering a question.
+The model may encode a property but ignore it during generation. This is like knowing a fact but failing to recall it when answering a question.
 
 ---
 
@@ -569,7 +569,7 @@ The model may encode a certain property but choose to ignore it during actual ge
 
 ### Why Safety Needs Interpretability
 
-In Chapter 4, we discussed alignment: using RLHF/DPO to make a model's behavior conform to human expectations. But alignment has a fundamental problem: **how do you confirm that the model is truly aligned, rather than merely pretending to be aligned on the surface?**
+Chapter 4 discussed alignment: using RLHF/DPO to make model behavior conform to human expectations. But alignment has a fundamental problem: **how do you confirm the model is truly aligned, rather than merely pretending to be?**
 
 This is the problem of **deceptive alignment**.
 
@@ -588,17 +588,17 @@ graph TD
     style F fill:#ffebee,stroke:#c62828
 ```
 
-This is not a purely theoretical hypothesis. [Hubinger et al. 2024, "Sleeper Agents"](https://arxiv.org/abs/2401.05566) experimentally demonstrated that this behavior can be implanted into an LLM:
+This is not purely theoretical. [Hubinger et al. 2024, "Sleeper Agents"](https://arxiv.org/abs/2401.05566) experimentally demonstrated that this behavior can be implanted into an LLM:
 
-- They trained a model that writes code normally when the prompt contains "2023", but inserts security vulnerabilities when it contains "2024"
-- Standard safety training (RLHF) **could not eliminate** this backdoor behavior
-- Safety training even made the model better at "hiding" this behavior
+- They trained a model that writes normal code when the prompt contains "2023" but inserts security vulnerabilities when it contains "2024"
+- Standard safety training (RLHF) **could not eliminate** this backdoor
+- Safety training actually made the model better at hiding the behavior
 
 ### How Interpretability Helps Detect Deception
 
-If we only look at a model's outputs (black-box evaluation), deceptive alignment is almost impossible to detect, because the model behaves normally when being tested.
+If we only look at outputs (black-box evaluation), deceptive alignment is nearly impossible to detect — the model behaves normally when tested.
 
-But if we can see the model's internal state, the situation is different:
+But if we can see the model's internal state, the picture changes:
 
 ```python
 # Pseudocode: monitor deception with SAE features
@@ -625,20 +625,20 @@ def monitor_for_deception(model, sae, input_text):
     return False
 ```
 
-This method is still very preliminary, but the idea is right: **do not look at what the model says; look at what the model is "thinking"**.
+This method is still preliminary, but the direction is right: **do not look at what the model says; look at what it is "thinking"**.
 
 ### Current Limitations
 
-Honestly, interpretability is still far from practical for safety:
+Honestly, interpretability remains far from practical for safety:
 
-1. **Incomplete coverage**: SAEs can find many features, but we cannot guarantee that all dangerous features have been found
-2. **Shallow feature understanding**: we know a feature is related to "deception", but we do not know its precise role in model computation
-3. **Scale challenges**: analyzing a model may require millions of features, and reviewing them one by one is unrealistic
-4. **Adversarial robustness**: if a model is smart enough, it may learn to encode deception in ways that interpretability tools cannot detect
+1. **Incomplete coverage**: SAEs find many features, but we cannot guarantee all dangerous ones have been found
+2. **Shallow understanding**: we know a feature relates to "deception", but not its precise role in model computation
+3. **Scale challenges**: analyzing a model may require millions of features; reviewing them one by one is unrealistic
+4. **Adversarial robustness**: a sufficiently capable model may learn to encode deception in ways interpretability tools cannot detect
 
 ### Long-Term Vision
 
-The ultimate goal of interpretability researchers is to **fully understand the model's internal computation**, just as we can fully understand the source code of a compiler.
+The ultimate goal is to **fully understand a model's internal computation**, the way we understand the source code of a compiler.
 
 ```
 Current state: can understand individual functions (circuits), can list variable names (features)
@@ -646,7 +646,7 @@ Medium-term goal: can understand major modules and detect key safety-relevant be
 Long-term goal: can fully audit the whole model and make mathematical guarantees about model behavior
 ```
 
-This goal may take decades. But even at its current early stage, interpretability has already provided some insights that black-box methods cannot provide.
+This goal may take decades. But even at its current early stage, interpretability already provides insights that black-box methods cannot.
 
 ---
 
@@ -654,7 +654,7 @@ This goal may take decades. But even at its current early stage, interpretabilit
 
 ### TransformerLens
 
-[TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) is the de facto standard toolkit for mechanistic interpretability research.
+[TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) is the standard toolkit for mechanistic interpretability research.
 
 ```python
 # Install
@@ -691,9 +691,9 @@ patching_results = patching.get_act_patch_resid_pre(
 
 ### Neuronpedia
 
-[Neuronpedia](https://www.neuronpedia.org/) is a browsable catalog of SAE features. You can search and browse millions of discovered features in your browser, and view each feature's activation examples, maximum-activation texts, and more.
+[Neuronpedia](https://www.neuronpedia.org/) is a browsable catalog of SAE features. You can search millions of discovered features in your browser and view each feature's activation examples, maximum-activation texts, and more.
 
-This is the lowest-barrier way to explore the inside of models: no code required.
+This is the lowest-barrier way to explore model internals — no code required.
 
 ### SAELens
 
@@ -732,11 +732,11 @@ print(f"Number of activated features: {active_features.shape[0]}")
 
 - **[patchscopes](https://github.com/google-research/patchscopes)**: a framework developed by Google for understanding model internal representations
 - **[CircuitsVis](https://github.com/TransformerLensOrg/CircuitsVis)**: a tool for visualizing attention patterns and SAE features
-- **[nnsight](https://github.com/ndif-team/nnsight)**: a library for remote access to and intervention in the internal state of large models, suitable for interpretability research without a GPU
+- **[nnsight](https://github.com/ndif-team/nnsight)**: a library for remotely accessing and intervening in the internal state of large models, suitable for interpretability research without a local GPU
 
 ### How to Get Started
 
-If you want to explore the inside of models yourself, this path is recommended:
+To start exploring model internals yourself, follow this path:
 
 ```
 1. Browse Neuronpedia -> get an intuitive feel for what SAE features look like
@@ -754,7 +754,7 @@ If you want to explore the inside of models yourself, this path is recommended:
 | [Scaling Monosemanticity](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) (Templeton et al. 2024) | Breakthrough results for large-scale SAEs | Must read |
 | [In-context Learning and Induction Heads](https://arxiv.org/abs/2209.11895) (Olsson et al. 2022) | Induction head circuits | Classic |
 | [Interpretability in the Wild](https://arxiv.org/abs/2211.00593) (Wang et al. 2022) | IOI circuit analysis | Classic |
-| [Emergent World Representations](https://arxiv.org/abs/2210.13382) (Li et al. 2023) | Othello-GPT | Stunning |
+| [Emergent World Representations](https://arxiv.org/abs/2210.13382) (Li et al. 2023) | Othello-GPT | Striking |
 | [Sleeper Agents](https://arxiv.org/abs/2401.05566) (Hubinger et al. 2024) | Backdoors and safety | Required reading for safety |
 | [Representation Engineering](https://arxiv.org/abs/2310.01405) (Zou et al. 2023) | Control at the representation level | Steering introduction |
 
@@ -781,14 +781,14 @@ graph TB
 
 Core points:
 
-1. **Superposition is the main obstacle to understanding**: one neuron encodes multiple concepts, so directly inspecting neurons is not useful
-2. **SAEs are currently the best decomposition tool**: they decompose dense activations into sparse, interpretable features
-3. **Circuits reveal algorithms inside models**: not just "what the model knows", but also "how the model computes"
-4. **Feature steering provides a new control paradigm**: directly modify internal state, more precisely than prompting
-5. **Probing proves that models know more than they say**: internal representations contain rich structured knowledge
-6. **Safety is the most important application direction for interpretability**: but it is still in an early stage
+1. **Superposition is the main obstacle to understanding**: one neuron encodes multiple concepts, so inspecting neurons directly is not useful
+2. **SAEs are the best decomposition tool available**: they decompose dense activations into sparse, interpretable features
+3. **Circuits reveal algorithms inside models**: not just "what the model knows" but "how the model computes"
+4. **Feature steering provides a new control paradigm**: modify internal state directly, with more precision than prompting
+5. **Probing proves models know more than they show**: internal representations contain rich structured knowledge
+6. **Safety is the most important application of interpretability**: but it remains in an early stage
 
-Interpretability is one of the youngest and most promising research directions in the LLM field. The future it promises is this: we will no longer use LLMs as black boxes, but understand them the way we understand a program. Although that future is still far away, every step of progress brings us closer to truly trustworthy AI systems.
+Interpretability is one of the youngest and most promising research directions in the LLM field. Its promise: we will no longer use LLMs as black boxes, but understand them the way we understand a program. That future is still distant, but every step of progress brings us closer to truly trustworthy AI systems.
 
 ---
 
