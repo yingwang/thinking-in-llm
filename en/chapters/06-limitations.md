@@ -159,7 +159,7 @@ Calculation must proceed from right to left (low-order digits to high-order digi
 
 ### Solution
 
-````python
+`````python
 # Option 1: code execution tool
 # Let the LLM write code, then execute the code to get the result
 """
@@ -188,7 +188,7 @@ tools = [{
         }
     }
 }]
-````
+`````
 
 **Core principle**: Any task that requires an exact numerical result should be handed to a code executor or calculator tool, not left to the LLM's direct reasoning.
 
