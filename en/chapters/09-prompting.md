@@ -2,14 +2,14 @@
 
 **中文**: [中文](../../chapters/09-prompting.md)
 
-# Chapter 9: Prompt Is Programming
+# Chapter 9: Prompting Is Programming
 
 > "The hottest new programming language is English."
 > — Andrej Karpathy
 
-If the first eight chapters were about understanding how the engine works, then from this chapter onward, we are learning how to drive. And the prompt is the steering wheel in your hands.
+If the first eight chapters were about understanding how the engine works, then from this chapter onward, we are learning how to drive. The prompt is the steering wheel in your hands.
 
-**Core argument: A prompt is not "talking to AI"; it is programming in natural language.** Once you accept this perspective, the way you treat prompts changes fundamentally, from "just trying things" to "serious engineering practice."
+**Core argument: a prompt is not "talking to AI"; it is programming in natural language.** Once you accept this perspective, the way you treat prompts changes fundamentally: from "just trying things" to "serious engineering practice."
 
 ---
 
@@ -17,17 +17,17 @@ If the first eight chapters were about understanding how the engine works, then 
 
 ### You Are Not "Telling" the Model What to Do
 
-Most people treat prompts as instructions: "Help me write a poem," "Translate this into English," "Summarize this article." This understanding is not wrong, but it is shallow.
+Most people treat prompts as instructions: "Help me write a poem," "Translate this into English," "Summarize this article." That understanding is not wrong, but it is shallow.
 
 Recall the core formula from Chapter 1:
 
 $$P(\text{output} \mid \text{prompt})$$
 
-Every prompt you write is essentially constructing a **conditional probability distribution**. You are not "commanding" the model to do something; you are building a probabilistic scene that makes the output you want the most likely continuation under that distribution.
+Every prompt you write essentially constructs a **conditional probability distribution**. You are not "commanding" the model to do something; you are building a probabilistic scene that makes the output you want the most likely continuation under that distribution.
 
 ### An Intuitive Analogy
 
-Imagine walking into a theater. The lighting, set design, and costumes on stage are all the prompt. After seeing these conditions, the actor (the model) naturally steps into the corresponding role. You have not told the actor line by line what to say, but the set has already determined what kind of play they are most likely to perform.
+Imagine walking into a theater. The lighting, set design, and costumes on stage are all part of the prompt. After seeing these conditions, the actor (the model) naturally steps into the corresponding role. You have not told the actor line by line what to say, but the set has already determined what kind of play they are most likely to perform.
 
 ```
 Set = ancient palace     → the actor is likely to start performing a period drama
@@ -39,7 +39,7 @@ The system prompt is the stage set. The few-shot examples you write are clips fr
 
 ### Small Changes, Large Effects
 
-Because you are manipulating a high-dimensional probability distribution, tiny changes can cause huge differences in the output. This is not a bug; it is an essential property of the system.
+Because you are manipulating a high-dimensional probability distribution, tiny changes can produce large differences in the output. This is not a bug; it is an essential property of the system.
 
 ```python
 # A seemingly tiny wording difference
@@ -51,25 +51,25 @@ prompt_b = "What are 3 reasons Python is popular?"
 # prompt_b → tends to generate a paragraph-style answer
 ```
 
-Why? Because the token "List" appears frequently in training data before list-formatted text, activating attention patterns related to "list format." "What are" appears more often in question-answer dialogue, activating a different generation pattern.
+Why? Because the token "List" frequently appears in training data before list-formatted text, activating attention patterns related to "list format." "What are" appears more often in question-answer dialogue, activating a different generation pattern.
 
-Tokens exist in a high-dimensional space, and tiny perturbations may cross a decision boundary, causing the model to follow a completely different generation path. This is like the butterfly effect in chaotic systems: the choice of the first token cascades into all subsequent tokens.
+Tokens exist in a high-dimensional space, and tiny perturbations may cross a decision boundary, causing the model to follow a completely different generation path. This is like the butterfly effect in chaotic systems: the choice of the first token cascades into every subsequent token.
 
 ---
 
 ## 9.2 The Programming Analogy for Prompts
 
-Once you see prompts as programming, many concepts from programming have direct counterparts:
+Once you see prompts as programming, many programming concepts have direct counterparts:
 
 | Programming Concept | Prompt Counterpart | Explanation |
 |---------|------------|------|
-| Class definition | System prompt | Defines behavior, persona, constraints |
+| Class definition | System prompt | Defines behavior, persona, and constraints |
 | Function call | User message | The concrete input |
 | Unit test | Few-shot examples | Shows expected input-output pairs |
 | Forced intermediate variables | CoT instruction | "Analyze first, then answer" |
 | Return type | Output format spec | "Return in JSON format" |
 | Determinism level | Temperature | 0 = fully deterministic, 1 = random |
-| Function signature | Tool/Function definition | Defines available tools and their parameters |
+| Function signature | Tool/function definition | Defines available tools and their parameters |
 | Comments | Explanations in the prompt | Help the model understand intent |
 
 ### System Prompt = Class Definition
@@ -130,7 +130,7 @@ Few-shot examples do more than show what the task is. They also implicitly defin
 - **Output range**: only three options
 - **Boundary cases**: how to handle neutral expressions
 
-This is why few-shot prompting is so powerful. It simultaneously conveys task definition, format requirements, and boundary-handling strategy, more precisely than any natural-language description.
+This is why few-shot prompting is so powerful. It conveys the task definition, format requirements, and boundary-handling strategy at the same time, often with more precision than any natural-language description.
 
 ### CoT = Forced Intermediate Variables
 
@@ -154,7 +154,7 @@ Please answer by following these steps:
 Problem: ...
 ```
 
-When you ask the model in a prompt to "think first, then answer," you are essentially **forcing the model to generate intermediate tokens**. Recall the insight from Chapter 8: more tokens = more computation steps. CoT instructions turn a "one-shot" problem into a problem that requires multi-step derivation, giving the model more "computation space."
+When you ask the model in a prompt to "think first, then answer," you are essentially **forcing the model to generate intermediate tokens**. Recall the insight from Chapter 8: more tokens = more computation steps. CoT instructions turn a "one-shot" problem into one that requires multi-step derivation, giving the model more "computation space."
 
 ---
 
@@ -162,7 +162,7 @@ When you ask the model in a prompt to "think first, then answer," you are essent
 
 ### Why Structured Output Is Needed
 
-LLMs generate free text by default. But in engineering systems, you almost always need **parseable output with a stable format**.
+LLMs generate free text by default. In engineering systems, however, you almost always need **parseable output with a stable format**.
 
 ```python
 # You want this
@@ -251,7 +251,7 @@ This is like defining parameter types for a function: `sentiment` can only be on
 
 ### Constrained Decoding: Enforcing Syntax at the Token Level
 
-The most aggressive approach is **constrained decoding**: when generating each token, directly mask tokens that do not satisfy the syntax.
+The most aggressive approach is **constrained decoding**: while generating each token, directly mask tokens that do not satisfy the syntax.
 
 ```python
 # Use the Outlines library for constrained decoding
@@ -278,7 +278,7 @@ result = generator("Analyze the sentiment of the following review: The food at t
 # result is guaranteed to conform to the SentimentResult schema
 ```
 
-How Outlines works: at each decoding step, it computes the set of legal tokens at the current position according to the JSON schema, and sets the probability of all other tokens to 0. This is equivalent to enforcing type checking at the token level.
+How Outlines works: at each decoding step, it computes the set of legal tokens at the current position according to the JSON schema, then sets the probability of all other tokens to 0. This is equivalent to enforcing type checking at the token level.
 
 ### Why Structured Output Works
 
@@ -301,7 +301,7 @@ Just as software engineering has design patterns, prompt engineering has develop
 
 ### Pattern 1: Role Prompting
 
-**Core idea**: Activate the knowledge and behavior patterns in the model's training data that are related to a role by assigning that role.
+**Core idea**: assign a role to activate the related knowledge and behavior patterns in the model's training data.
 
 ```
 ❌ Generic prompt:
@@ -312,13 +312,13 @@ You are a physics professor who is good at using simple analogies to explain com
 Please explain quantum entanglement.
 ```
 
-Why does it work? The model's training data contains a large amount of text from professors giving lectures. The role label "physics professor" activates related language patterns: more likely to use analogies, explain step by step, and avoid excessive jargon.
+Why does it work? The model's training data contains a large body of text from professors giving lectures. The role label "physics professor" activates related language patterns: the model is more likely to use analogies, explain step by step, and avoid excessive jargon.
 
-But note: role prompting is not omnipotent. Saying "you are the best mathematician in the world" will not make the model's arithmetic more accurate, because the role changes the **language pattern**, not the **underlying computational ability**.
+But note: role prompting is not magic. Saying "you are the best mathematician in the world" will not make the model's arithmetic more accurate, because the role changes the **language pattern**, not the **underlying computational ability**.
 
 ### Pattern 2: Step-by-Step
 
-**Core idea**: Break a complex task into an explicit sequence of steps.
+**Core idea**: break a complex task into an explicit sequence of steps.
 
 ```
 ❌ One-shot:
@@ -332,11 +332,11 @@ Please analyze this code according to the following steps:
 4. Provide the complete fixed code
 ```
 
-This pattern essentially **forces the generation of intermediate reasoning tokens**. The model cannot skip steps. It must first complete the text for step 1 before it can start step 2.
+This pattern essentially **forces the generation of intermediate reasoning tokens**. The model cannot skip steps. It must complete the text for step 1 before it can start step 2.
 
 ### Pattern 3: Self-Critique
 
-**Core idea**: Have the model review its own output, find mistakes, and correct them.
+**Core idea**: have the model review its own output, find mistakes, and correct them.
 
 ```
 Please answer using the following process:
@@ -349,11 +349,11 @@ Please answer using the following process:
 3. [Revised version] Based on the critique, provide the revised final answer
 ```
 
-Why does this work? In the "critique" stage, the conditions the model sees have changed. It is no longer generating from scratch; it is making judgments based on an existing output. This is similar to humans rereading an essay after writing it. You can often catch problems you did not notice while writing.
+Why does this work? In the "critique" stage, the conditions the model sees have changed. It is no longer generating from scratch; it is judging an existing output. This is similar to rereading an essay after writing it: you can often catch problems you did not notice while drafting.
 
 ### Pattern 4: Decomposition
 
-**Core idea**: Decompose a complex task into multiple simple subtasks.
+**Core idea**: decompose a complex task into multiple simple subtasks.
 
 ```
 ❌ One huge prompt:
@@ -367,11 +367,11 @@ Prompt 3: Based on the comparison results, identify research gaps
 Prompt 4: Based on the gaps, propose new directions
 ```
 
-This pattern addresses a fundamental limitation of LLMs: autoregressive generation has no global planning ability (Chapter 8). By manually decomposing the steps, we turn a "hard problem requiring global planning" into "multiple simple problems requiring only local reasoning."
+This pattern addresses a fundamental limitation of LLMs: autoregressive generation does not have global planning capability (Chapter 8). By manually decomposing the steps, we turn a "hard problem requiring global planning" into "multiple simple problems requiring only local reasoning."
 
 ### Pattern 5: Meta-Prompting
 
-**Core idea**: Have the model design the prompt itself.
+**Core idea**: have the model design the prompt itself.
 
 ```
 I need an LLM to extract structured data from product reviews (product name, pros, cons, rating).
@@ -381,7 +381,7 @@ Please design an efficient prompt for this task, with the following requirements
 3. When information is insufficient, it outputs null instead of guessing
 ```
 
-The deeper principle behind meta-prompting: the model has seen a large number of prompt engineering discussions and tutorials in its training data, so it "knows" what kinds of prompts are effective. Having it generate prompts uses this meta-knowledge.
+The deeper principle behind meta-prompting is that the model has seen many prompt engineering discussions and tutorials in its training data, so it "knows" what kinds of prompts are effective. Having it generate prompts uses this meta-knowledge.
 
 ---
 
@@ -389,7 +389,7 @@ The deeper principle behind meta-prompting: the model has seen a large number of
 
 ### The Butterfly Effect at the Token Level
 
-Let us look from the token perspective at how tiny wording changes can produce huge effects.
+Let us look at how tiny wording changes can produce large effects from the token perspective.
 
 ```python
 import tiktoken
@@ -406,11 +406,11 @@ print(f"Prompt A tokens: {tokens_a}")  # Different token sequence
 print(f"Prompt B tokens: {tokens_b}")  # Different token sequence
 ```
 
-Even if the semantics are the same, different wordings are different inputs in token space. This means they produce different hidden states after passing through the attention layers, and eventually different output probability distributions.
+Even when the semantics are the same, different wordings are different inputs in token space. This means they produce different hidden states after passing through the attention layers, and eventually different output probability distributions.
 
 ### The Cascading Effect of the First Token
 
-One key property of autoregressive generation: **each token choice depends on all previous tokens**. This means that if the first generated token is different, all subsequent tokens will be affected.
+One key property of autoregressive generation is that **each token choice depends on all previous tokens**. This means that if the first generated token is different, all subsequent tokens will be affected.
 
 ```
 Prompt: "What is the capital of France? Please answer in one sentence."
@@ -419,11 +419,11 @@ Path A: "The" → "capital" → "of" → "France" → "is" → "Paris" → "."
 Path B: "Paris" → "is" → "the" → "capital" → "of" → "France" → "..." → (a longer explanation)
 ```
 
-Whether the first token is "The" or "Paris" determines the structure of the whole answer. A tiny prompt change may flip the probability ranking of the first token, even if it is only from 0.49 to 0.51.
+Whether the first token is "The" or "Paris" determines the structure of the whole answer. A tiny prompt change may flip the probability ranking of the first token, even if only from 0.49 to 0.51.
 
 ### Word Order Affects Attention Patterns
 
-Attention in Transformers is **position-sensitive**. The same words placed in different positions form different attention patterns:
+Attention in Transformers is **position-sensitive**. The same words placed in different positions create different attention patterns:
 
 ```
 Prompt A: "Please analyze the reasons first, then give suggestions"
@@ -437,7 +437,7 @@ Prompt B: "Please give suggestions, and analyze the reasons"
 
 ### Practical Principle: Always Do A/B Testing
 
-Based on the analysis above, one iron rule is: **never assume one prompt is better than another; measure it**.
+Based on the analysis above, one hard rule is: **never assume one prompt is better than another; measure it**.
 
 ```python
 # A simple prompt A/B testing framework
@@ -475,7 +475,7 @@ prompt_b = "Translate the following Chinese into idiomatic English. Preserve the
 
 ### Template Variables: Parameters in Prompts
 
-Good prompts are not hardcoded strings; they are templates with parameters.
+Good prompts are not hardcoded strings; they are parameterized templates.
 
 ```python
 # Hardcoded — not reusable
@@ -507,7 +507,7 @@ prompt = build_translation_prompt(
 def build_analysis_prompt(text: str, text_type: str) -> str:
     base = "Analyze the sentiment tendency of the following text.\n\n"
 
-    # Add different guidance according to the text type
+    # Add guidance based on the text type
     if text_type == "review":
         base += "This is a product review. Focus on: product quality, service attitude, value for money.\n"
     elif text_type == "social_media":
@@ -530,14 +530,14 @@ async def research_pipeline(topic: str, client) -> dict:
     keywords_response = await call_llm(client, keywords_prompt)
     keywords = json.loads(keywords_response)
 
-    # Step 2: Generate a summary for each keyword (the output of the previous step is the input to this step)
+    # Step 2: Generate a summary for each keyword (the previous step's output is this step's input)
     summaries = []
     for kw in keywords:
         summary_prompt = f"Write a 100-word summary about the topic \"{kw}\", focusing on the latest progress."
         summary = await call_llm(client, summary_prompt)
         summaries.append({"keyword": kw, "summary": summary})
 
-    # Step 3: Synthesize all summaries (the outputs of all previous steps are the input to this step)
+    # Step 3: Synthesize all summaries (the previous steps' outputs are this step's input)
     synthesis_prompt = f"""Based on the following research summaries, write a comprehensive analysis report about \"{topic}\".
 
 Summaries:
@@ -555,7 +555,7 @@ Requirements:
 
 ### Version Control: Manage Prompts Like Code
 
-Prompts should be managed as code:
+Prompts should be managed like code:
 
 ```
 prompts/
@@ -583,7 +583,7 @@ translation:
 
 Key principles:
 - **Every change must be recorded**: why it changed and what changed
-- **Every version has evaluation results**: you cannot say "it got better" based only on feeling
+- **Every version has evaluation results**: you cannot claim "it got better" based on intuition alone
 - **Separate production and experimental versions**: like main and feature branches in code
 - **Prompt review is just as important as code review**
 
@@ -605,8 +605,8 @@ Email: {email_content}
 
 **Problems**:
 - Output format is uncertain (it may be a paragraph, list, JSON, and so on)
-- "Key information" is vague; the model does not know which fields you want
-- There are no examples, so the model can only guess the format you want
+- "Key information" is vague; the requested fields are unclear
+- There are no examples, so the model has to infer the desired format
 
 **Actual output** (unreliable):
 ```
@@ -670,7 +670,7 @@ Output:
 
 **V3 improvements**:
 1. **Role setting**: clearly defined as an "analysis system"
-2. **Fields use English enums**: avoids mixing Chinese and English and makes downstream parsing easier
+2. **Fields use English enums**: this avoids mixing Chinese and English and makes downstream parsing easier
 3. **null handling**: explicitly defines behavior when information is missing
 4. **Judgment criteria**: urgency has clear rules
 5. **Three few-shot examples**: cover high/medium/low urgency and different categories
@@ -742,7 +742,7 @@ def analyze_email(email_content: str) -> dict:
 
 **Further improvements in V4**:
 1. **JSON mode enforcement**: `response_format={"type": "json_object"}`
-2. **confidence field**: has the model report confidence, so low-confidence results can be escalated to humans
+2. **confidence field**: has the model report confidence so low-confidence results can be escalated to humans
 3. **Temperature=0**: classification tasks need determinism
 4. **Post-processing validation**: even with JSON mode, still validate the schema
 5. **Few-shot examples placed in conversation turns**: more effective than putting them in the system prompt
@@ -766,7 +766,7 @@ graph LR
 2. **Explicit > implicit**: the model will not guess what you mean; write everything clearly
 3. **Few-shot examples are the most effective "documentation"**: three good examples beat a page of description
 4. **Always prepare for failure**: add confidence, validation, and fallback strategies
-5. **Measure, do not guess**: run evaluations on real data, do not iterate based on feeling
+5. **Measure, do not guess**: run evaluations on real data; do not iterate based on feeling
 
 ---
 
@@ -791,13 +791,13 @@ graph TB
 
 Core takeaways:
 
-1. **Prompts are constructors of conditional probability**, not natural-language instructions
+1. **Prompts construct conditional probability distributions**, not natural-language instructions
 2. **The programming analogy works**: System prompt = class definition, Few-shot = unit tests, CoT = intermediate variables
-3. **Structured output is your best friend**: JSON mode, function calling, and constrained decoding strengthen constraints step by step
+3. **Structured output is your most practical tool**: JSON mode, function calling, and constrained decoding strengthen constraints step by step
 4. **Master the core patterns**: role prompting, step-by-step, self-critique, decomposition, meta-prompting
 5. **Tiny changes may produce huge differences**: always let data speak, not intuition
 6. **Prompt management should be like code management**: templating, version control, review process
-7. **Iteration is the right path**: there is no perfect first version of a prompt
+7. **Iteration is the right process**: there is no perfect first version of a prompt
 
 ---
 

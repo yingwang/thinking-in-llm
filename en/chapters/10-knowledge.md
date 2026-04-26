@@ -6,9 +6,9 @@
 
 > "An LLM without external knowledge is like a brilliant person with amnesia — great at thinking, terrible at remembering."
 
-An LLM's training data has a cutoff date, its parameter space has a capacity limit, and its context window has a length limit. When your application needs the model to answer "things it does not know," you need to **inject knowledge**.
+An LLM's training data has a cutoff date, its parameters have finite capacity, and its context window has a length limit. When your application needs the model to answer questions about "things it does not know," you need to **inject knowledge**.
 
-**Core argument: RAG, fine-tuning, and long context are three fundamentally different ways to inject knowledge, each with its own suitable scenarios. Choosing the wrong one is not a matter of poor results; it is a matter of going in the wrong direction.**
+**Core argument: RAG, fine-tuning, and long context are three fundamentally different ways to inject knowledge, each suited to different scenarios. Choosing the wrong one is not just a matter of poor results; it means heading in the wrong direction.**
 
 ---
 
@@ -21,7 +21,7 @@ The best analogy for understanding the three approaches is an exam:
 | Approach | Analogy | Where the knowledge lives | Update cost |
 |------|------|-----------|---------|
 | **RAG** | Open-book exam: bring reference books into the exam room | External database (retrieved at runtime) | Low (just update the database) |
-| **Fine-tuning** | Studying for months: knowledge engraved into the brain | Model weights (written during training) | High (requires retraining) |
+| **Fine-tuning** | Studying for months: knowledge committed to memory | Model weights (written during training) | High (requires retraining) |
 | **Long Context** | Last-minute cramming before the exam: read the whole book once | Prompt context (passed in on each call) | None (just swap the document) |
 
 ### RAG (Retrieval-Augmented Generation)
@@ -36,7 +36,7 @@ flowchart LR
     G --> A[Answer]
 ```
 
-**Core idea**: Do not stuff knowledge into the model; look it up when needed.
+**Core idea**: Do not store knowledge in the model; look it up when needed.
 
 ```python
 # The simplest RAG implementation
@@ -44,7 +44,7 @@ def rag_answer(question: str, documents: list[str]) -> str:
     # 1. Retrieve relevant documents
     relevant_docs = retrieve(question, documents, top_k=3)
 
-    # 2. Give the retrieved documents and the question to the LLM together
+    # 2. Pass the retrieved documents and the question to the LLM together
     prompt = f"""Answer the user's question based on the following reference materials. If the materials do not contain relevant information, say "I'm not sure."
 
 Reference materials:
@@ -56,12 +56,12 @@ Answer:"""
     return call_llm(prompt)
 ```
 
-**Advantages**: Knowledge can be updated in real time; sources can be traced (citations); no need to retrain the model.
-**Disadvantages**: Depends on retrieval quality; adds latency; retrieval failure = answer failure.
+**Advantages**: Knowledge can be updated in real time; sources can be traced through citations; the model does not need retraining.
+**Disadvantages**: Depends on retrieval quality; adds latency; retrieval failure means answer failure.
 
 ### Fine-tuning
 
-**Core idea**: Use additional training to write knowledge/behavior patterns into model weights.
+**Core idea**: Use additional training to write knowledge or behavior patterns into model weights.
 
 ```python
 # Fine-tuning data format (SFT)
@@ -77,7 +77,7 @@ training_data = [
 ]
 ```
 
-**Advantages**: Changes the model's behavior/style/format; no extra retrieval needed at inference time; low latency.
+**Advantages**: Changes the model's behavior, style, or format; no extra retrieval is needed at inference time; low latency.
 **Disadvantages**: High training cost; knowledge updates require retraining; easy to overfit.
 
 ### Long Context
@@ -96,14 +96,14 @@ Answer based on the documentation above: {question}"""
     return call_llm(prompt)  # May consume 100K+ tokens
 ```
 
-**Advantages**: Simplest: no retrieval pipeline, no training; all information is in the context.
-**Disadvantages**: Expensive (billed by token); has length limits; suffers from the "lost in the middle" problem.
+**Advantages**: The simplest option: no retrieval pipeline, no training, and all information is in the context.
+**Disadvantages**: Expensive because it is billed by token; constrained by length limits; vulnerable to the "lost in the middle" problem.
 
 ---
 
 ## 10.2 RAG in Depth
 
-RAG is the most commonly used knowledge injection method. Let's break down each part of it.
+RAG is the most commonly used method for knowledge injection. Let's break down each part.
 
 ### Complete RAG Pipeline
 
@@ -132,7 +132,7 @@ flowchart TB
 
 ### Embedding: Turning Text into Vectors
 
-An embedding model maps a piece of text into a high-dimensional vector space. Semantically similar texts are close to each other in that vector space.
+An embedding model maps a piece of text into a high-dimensional vector space. Texts with similar meanings are close to each other in that space.
 
 ```python
 from openai import OpenAI
@@ -165,7 +165,7 @@ A good embedding model needs:
 
 ### Chunking: The Most Underestimated Engineering Decision
 
-Chunking is the process of cutting long documents into small pieces. This seemingly simple step often determines the ceiling of a RAG system.
+Chunking is the process of cutting long documents into smaller pieces. This seemingly simple step often determines the performance ceiling of a RAG system.
 
 ```python
 # Strategy 1: Fixed-size splitting (simple but crude)
@@ -175,7 +175,7 @@ def fixed_size_chunks(text: str, chunk_size: int = 500, overlap: int = 50) -> li
     while start < len(text):
         end = start + chunk_size
         chunks.append(text[start:end])
-        start = end - overlap  # The overlap keeps context continuous
+        start = end - overlap  # Overlap keeps the context continuous
     return chunks
 
 # Strategy 2: Semantic splitting (by natural boundaries such as paragraphs and headings)
@@ -210,26 +210,26 @@ def semantic_chunks(text: str) -> list[str]:
 | Chunk too small | Chunk too large |
 |-----------|-----------|
 | Loses context (who does "he" refer to?) | Dilutes relevance (only one sentence in a large passage is useful) |
-| High retrieval precision but incomplete recalled information | Retrieved, but the LLM must find the answer in long text |
+| High retrieval precision, but incomplete recall | Retrieved, but the LLM must find the answer in long text |
 | Suitable for precise factual queries | Suitable for questions that need complete arguments |
 
-**Practical advice**: Start with 500-1000 token chunks, add 10-20% overlap, then adjust based on evaluation results.
+**Practical advice**: Start with 500-1000-token chunks, add 10-20% overlap, and then adjust based on evaluation results.
 
 ### Vector Search: HNSW vs IVF
 
-The core problem in vector retrieval: quickly find the most similar top-K among millions of vectors. The time complexity of exact search (brute-force comparison) is O(n), which is unacceptable. So we use approximate nearest neighbor (ANN) algorithms.
+The core problem in vector retrieval is quickly finding the most similar top-K items among millions of vectors. The time complexity of exact search (brute-force comparison) is O(n), which is unacceptable at scale. That is why we use approximate nearest neighbor (ANN) algorithms.
 
 **HNSW (Hierarchical Navigable Small World)**:
-- Builds a multilayer graph structure, where each layer is a "shortcut path" over the layer below
-- Starts searching from the top layer and refines layer by layer
-- Advantages: fast search (millisecond level), high recall
+- Builds a multilayer graph structure, where each layer acts as a "shortcut path" over the layer below
+- Starts searching from the top layer and refines the search layer by layer
+- Advantages: fast search (millisecond-level), high recall
 - Disadvantages: large memory footprint (all vectors plus the graph structure are in memory)
-- Suitable for: datasets up to the million scale
+- Suitable for: datasets up to the million-vector scale
 
 **IVF+PQ (Inverted File Index + Product Quantization)**:
 - IVF: first clusters the vector space, then searches only within relevant clusters
 - PQ: compresses high-dimensional vectors into short codes, reducing storage and computation
-- Advantages: memory-efficient, can handle hundred-million-scale data
+- Advantages: memory-efficient, can handle hundreds of millions of vectors
 - Disadvantages: recall is slightly lower than HNSW
 - Suitable for: large-scale datasets
 
@@ -262,7 +262,7 @@ distances, indices = index_hnsw.search(
 
 ### Hybrid Search: Vectors + Keywords
 
-The weakness of pure vector search: it is not good at **exact matches** (product names, error codes, people's names). The weakness of BM25 (classic keyword search): it does not understand semantics ("how to lose weight" and "weight loss methods" are different keywords).
+The weakness of pure vector search is that it is not good at **exact matches** (product names, error codes, people's names). The weakness of BM25 (classic keyword search) is that it does not understand semantics ("how to lose weight" and "weight loss methods" use different wording).
 
 Solution: combine the two.
 
@@ -296,7 +296,7 @@ def hybrid_search(query: str, top_k: int = 10) -> list[Document]:
 
 ### Reranker: Fine Ranking
 
-Vector search and BM25 are both "two-tower models": the query and document are encoded independently, then the vectors are compared. This is fast, but rough.
+Vector search and BM25 are both "two-tower models": the query and document are encoded independently, and then their vectors are compared. This is fast but coarse.
 
 A cross-encoder reranker concatenates the query and document as input, letting the model see their **interaction** and produce a more accurate relevance score.
 
@@ -318,17 +318,17 @@ def rerank(query: str, documents: list[str], top_n: int = 5) -> list[str]:
     return [doc for doc, _ in ranked[:top_n]]
 ```
 
-**Why not use a cross-encoder for search directly?** Because it is too slow. A cross-encoder has to concatenate the query with every document and run the model once. One million documents means one million model runs. So in practice the pattern is always: first use a fast method (vector/BM25) to roughly select top-100, then use a cross-encoder to fine-rank top-10.
+**Why not use a cross-encoder for search directly?** Because it is too slow. A cross-encoder has to concatenate the query with every document and run the model once. One million documents means one million model runs. In practice, the pattern is always: first use a fast method (vector/BM25) to roughly select the top 100, then use a cross-encoder to fine-rank the top 10.
 
 ---
 
 ## 10.3 RAG Optimization
 
-After the basic RAG pipeline is set up, there are many ways to optimize it.
+After the basic RAG pipeline is in place, there are many ways to optimize it.
 
 ### Query Expansion: Improving the Retrieval Entry Point
 
-User queries are often not precise enough, or they do not match how the documents phrase things.
+User queries are often not precise enough, or they do not match the wording used in the documents.
 
 ```python
 def expand_query(original_query: str) -> list[str]:
@@ -355,7 +355,7 @@ Only output the queries, one per line."""
 
 ### HyDE: Hypothetical Document Embeddings
 
-A clever trick: instead of searching directly with the query, first ask the LLM to generate a "hypothetical answer," then use the embedding of that answer to search.
+A clever trick: instead of searching directly with the query, first ask the LLM to generate a "hypothetical answer," then search using the embedding of that answer.
 
 ```python
 def hyde_search(query: str, vector_store) -> list[str]:
@@ -374,20 +374,20 @@ def hyde_search(query: str, vector_store) -> list[str]:
     return results
 ```
 
-**Why does it work?** Queries and documents have different "shapes" in semantic space: a query is an interrogative sentence, while a document is declarative. HyDE converts the query into a declarative form and narrows this "shape difference."
+**Why does it work?** Queries and documents have different "shapes" in semantic space: a query is an interrogative sentence, while a document is declarative. HyDE converts the query into a declarative form and reduces this "shape difference."
 
 Reference paper: [Precise Zero-Shot Dense Retrieval without Relevance Labels](https://arxiv.org/abs/2212.10496) (Gao et al. 2022)
 
 ### Small-to-Big: Retrieve Small Chunks, Return Big Chunks
 
 ```python
-# Problem: small chunks retrieve precisely, but do not contain enough context
+# Problem: small chunks retrieve precise matches, but do not contain enough context
 # Solution: use small chunks for retrieval, return big chunks
 
 class SmallToBigRetriever:
     def __init__(self):
         self.small_chunks = {}  # chunk_id -> small text (used for retrieval)
-        self.parent_chunks = {} # chunk_id -> parent_chunk_id (mapping relationship)
+        self.parent_chunks = {} # chunk_id -> parent_chunk_id (mapping)
         self.big_chunks = {}    # parent_chunk_id -> big text (used for return)
 
     def index(self, document: str):
@@ -417,7 +417,7 @@ class SmallToBigRetriever:
 
 ### Agentic RAG: Letting the Model Decide Whether to Retrieve
 
-Traditional RAG retrieves every time. But some questions do not need retrieval ("1+1=?"), while others need multiple retrievals ("compare the financial condition of company A and company B").
+Traditional RAG retrieves every time. But some questions do not need retrieval ("1+1=?"), while others need multiple retrievals ("compare the financial health of company A and company B").
 
 ```python
 def agentic_rag(question: str) -> str:
@@ -469,14 +469,14 @@ def agentic_rag(question: str) -> str:
 
 ### When You Should Fine-tune
 
-A key realization: **the purpose of fine-tuning is to change behavior, not to inject facts**.
+A key realization: **fine-tuning is for changing behavior, not injecting facts**.
 
 ```
 ✅ Scenarios suitable for fine-tuning:
 - Change output style (formal -> conversational, English -> Chinese medical terminology)
 - Change output format (free text -> specific JSON schema)
 - Learn domain-specific reasoning patterns (legal reasoning, medical diagnosis workflows)
-- Reduce refusals (let the model handle legitimate tasks that are refused by default)
+- Reduce refusals (let the model handle legitimate tasks that would otherwise be refused)
 
 ❌ Scenarios unsuitable for fine-tuning:
 - Inject the latest facts (use RAG)
@@ -486,7 +486,7 @@ A key realization: **the purpose of fine-tuning is to change behavior, not to in
 
 ### SFT (Supervised Fine-tuning)
 
-The most direct method: prepare instruction-response pairs and let the model learn from them.
+The most direct method is to prepare instruction-response pairs and let the model learn from them.
 
 ```python
 # Use the OpenAI fine-tuning API
@@ -521,12 +521,12 @@ response = client.chat.completions.create(
 
 ### LoRA / QLoRA: Parameter-Efficient Fine-tuning
 
-Full fine-tuning modifies all model parameters, which is very expensive. LoRA (Low-Rank Adaptation) modifies only a small subset of parameters.
+Full fine-tuning modifies all model parameters, which is very expensive. LoRA (Low-Rank Adaptation) modifies only a small subset of them.
 
-**Core idea**: Do not modify the weight matrix W directly. Instead, add a low-rank decomposition ΔW = BA, where the dimensions of B and A are much smaller than W.
+**Core idea**: Do not modify the weight matrix W directly. Instead, add a low-rank decomposition ΔW = BA, where B and A have much smaller dimensions than W.
 
 ```python
-# Use HuggingFace PEFT + TRL for LoRA fine-tuning
+# Use Hugging Face PEFT + TRL for LoRA fine-tuning
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
 from trl import SFTTrainer, SFTConfig
@@ -571,14 +571,14 @@ trainer = SFTTrainer(
 trainer.train()
 ```
 
-**QLoRA** goes one step further: the base model is loaded with 4-bit quantization, and only the LoRA parameters are trained. A single 24GB consumer GPU can fine-tune a 70B model.
+**QLoRA** goes one step further: the base model is loaded with 4-bit quantization, and only the LoRA parameters are trained. A single 24 GB consumer GPU can fine-tune a 70B model.
 
 ### Common Fine-tuning Mistakes
 
 1. **Too little data**: It is hard to get results with fewer than 100 examples. At least 500-1000 high-quality examples are recommended.
-2. **Poor data quality**: 100 high-quality examples > 10000 low-quality examples. Every example should be "the ideal answer you want the model to output."
-3. **Overfitting**: Training loss is very low but performance gets worse: the model memorized the training data and lost generalization ability.
-4. **Wrong task definition**: Doing fine-tuning with the mindset of "teaching facts" (you should use RAG).
+2. **Poor data quality**: 100 high-quality examples > 10,000 low-quality examples. Every example should be "the ideal answer you want the model to output."
+3. **Overfitting**: Training loss is very low, but performance gets worse: the model has memorized the training data and lost generalization ability.
+4. **Wrong task definition**: Fine-tuning with the mindset of "teaching facts" (you should use RAG).
 5. **Wrong evaluation metric**: Looking only at loss instead of actual output quality.
 
 ---
@@ -602,7 +602,7 @@ trainer.train()
 
 **Trap 1: Lost in the Middle**
 
-Research by [Liu et al. 2023](https://arxiv.org/abs/2307.03172) found that model performance drops significantly when relevant information is in the **middle** of a long context. Models are better at using information near the beginning and the end.
+Research by [Liu et al. 2023](https://arxiv.org/abs/2307.03172) found that model performance drops significantly when relevant information appears in the **middle** of a long context. Models are better at using information near the beginning and the end.
 
 ```
 Information position:  [Beginning] <- Good performance
@@ -614,9 +614,9 @@ Information position:  [Beginning] <- Good performance
 
 ```python
 # Cost comparison
-# Suppose GPT-4o is used: $2.50/1M input tokens
+# Suppose GPT-4o is used: $2.50 per 1M input tokens
 
-# RAG approach: pass only 3 relevant chunks (about 1500 tokens)
+# RAG approach: pass only 3 relevant chunks (about 1,500 tokens)
 rag_cost_per_query = 1500 / 1_000_000 * 2.50  # $0.00375
 
 # Long-context approach: pass the whole document (100K tokens)
@@ -627,15 +627,15 @@ long_context_cost_per_query = 100_000 / 1_000_000 * 2.50  # $0.25
 
 **Trap 3: Latency**
 
-Processing 100K tokens has much higher latency than processing 1K tokens. In user-interaction scenarios, this difference is obvious.
+Processing 100K tokens has much higher latency than processing 1K tokens. In interactive user scenarios, this difference is obvious.
 
 ### When Long Context Is the Right Choice
 
 Despite these drawbacks, long context is optimal in some scenarios:
 
-- **The number of documents is small, and every query needs global understanding** (for example, analyzing all clauses in a contract)
+- **The document set is small, and every query needs global understanding** (for example, analyzing all clauses in a contract)
 - **Rapid prototyping**: first validate feasibility with long context, then decide whether to invest in a RAG pipeline
-- **Strong dependencies across contexts**: RAG chunking would cut these dependencies
+- **Strong dependencies across contexts**: RAG chunking would break these dependencies
 
 ---
 
@@ -691,7 +691,7 @@ Before choosing an approach, answer these questions:
 3. **Need to change model behavior?** Yes -> fine-tune
 4. **How large is the total document volume?** < 100K tokens -> long context; > 100K -> RAG
 5. **Latency requirements?** Strict -> fine-tune (no extra retrieval); loose -> RAG
-6. **Budget?** Passing the full document on every query is too expensive -> RAG
+6. **Budget?** If passing the full document on every query is too expensive -> RAG
 
 ---
 
@@ -743,9 +743,9 @@ Why is direction more important than length? Because embeddings encode **semanti
 
 ### Choosing an Embedding Model
 
-The [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) is a reference for choosing embedding models. But note:
+The [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) is a useful reference for choosing embedding models. But note:
 
-1. **Domain match**: First place on a general benchmark is not necessarily suitable for your domain. Vertical domains such as medicine, law, and code may need specialized embedding models.
+1. **Domain match**: First place on a general benchmark is not necessarily the best fit for your domain. Vertical domains such as medicine, law, and code may need specialized embedding models.
 2. **Dimension and speed**: Higher-dimensional vectors are more expressive, but storage and search costs are higher. 768 dimensions is usually a good balance.
 3. **Multilingual support**: If your data is in Chinese, make sure the selected model performs well on Chinese (BAAI/bge series, Cohere multilingual).
 4. **Do you need to train your own?** In most cases, off-the-shelf models are enough. Only consider training your own embedding model when your domain terminology is extremely specialized (such as semiconductor manufacturing terminology).
@@ -780,8 +780,8 @@ Core takeaways:
 1. **The three approaches are fundamentally different**: RAG is retrieval, fine-tuning is training, and long context is filling the prompt
 2. **RAG is the most general choice**: supports updates, supports citations, and has controllable cost
 3. **Fine-tuning changes behavior; it does not inject facts**: this is the most common misuse
-4. **Long context is simple but costly**: high cost, lost in the middle, high latency
-5. **Chunking is RAG's hidden killer**: you can never spend too much time on your chunking strategy
+4. **Long context is simple but costly**: high cost, lost-in-the-middle failures, and high latency
+5. **Chunking is RAG's hidden bottleneck**: it is worth spending serious time on your chunking strategy
 6. **Hybrid search > pure vector search**: BM25 + vectors + reranker is the current best practice
 7. **Real-world systems often combine all three**: it is not an either-or choice
 
@@ -797,4 +797,4 @@ Core takeaways:
 - [MTEB: Massive Text Embedding Benchmark](https://arxiv.org/abs/2210.07316) — Muennighoff et al. 2022
 - [FAISS](https://github.com/facebookresearch/faiss) — Facebook's vector search library
 - [LangChain RAG Tutorial](https://python.langchain.com/docs/tutorials/rag/)
-- [HuggingFace TRL](https://github.com/huggingface/trl) — A toolkit for training language models
+- [Hugging Face TRL](https://github.com/huggingface/trl) — A toolkit for training language models

@@ -7,11 +7,11 @@
 > "The base model is a shoggoth. Alignment is the smiley face on top."
 > — A classic AI Twitter meme
 
-In the first three chapters, we saw how a powerful capability base is trained. But this base model has a serious problem: **it can do anything, but it does not "want" to do anything**. It is not an assistant, not a conversational partner, not a tool. It is only a continuation engine: given something, it continues it, regardless of good or bad.
+In the first three chapters, we saw how a powerful base of capabilities is trained. But this base model has a serious problem: **it can do anything, but it does not "want" to do anything**. It is not an assistant, not a conversational partner, and not a tool. It is only a continuation engine: given some text, it continues that text, whether the continuation is good or bad.
 
-The task of alignment is: **do not change the model's capabilities, but change the way it expresses those capabilities**. Turn it from a neutral continuation engine into a helpful, safe, and honest assistant.
+The task of alignment is to **leave the model's capabilities intact while changing how it expresses them**. Alignment turns a neutral continuation engine into a helpful, safe, and honest assistant.
 
-This chapter is the most practically valuable chapter in the book. Understanding alignment means understanding how the ChatGPT, Claude, and Gemini you use every day are turned from "raw models" into "products."
+This is the book's most practically valuable chapter. Understanding alignment means understanding how the ChatGPT, Claude, and Gemini systems you use every day are turned from "raw models" into "products."
 
 ---
 
@@ -19,7 +19,7 @@ This chapter is the most practically valuable chapter in the book. Understanding
 
 ### A Continuation Engine Is Not an Assistant
 
-Recall Chapter 1: what a base model does is $P(\text{next\_token} | \text{context})$. It does not know that you are "asking a question," and it does not know that it should "answer." It only knows how to continue text.
+Recall Chapter 1: what a base model does is estimate $P(\text{next\_token} | \text{context})$. It does not know that you are "asking a question," and it does not know that it should "answer." It only knows how to continue text.
 
 ```
 # Typical behavior of a base model
@@ -41,13 +41,13 @@ My wife and I moved here after..."
 The problem with a base model is not that it is "not smart enough," but that:
 1. **It does not know what role it should play**
 2. **It has no judgment about harmful content**: whatever exists in the training data, it can generate
-3. **It does not know the format of "answering questions"**: it only knows how to continue text
+3. **It does not know the format for "answering questions"**: it only knows how to continue text
 
 ### A Concrete Analogy
 
-Imagine a genius who has read every book humanity has ever written, but has never interacted with people. You ask him a question, and he might start reciting an encyclopedia, or start making up a story, or start reading a passage from a crime novel. He does not lack knowledge; what he lacks is **a way to interact with people**.
+Imagine a genius who has read every book humanity has ever written but has never interacted with people. You ask him a question, and he might start reciting an encyclopedia, making up a story, or reading a passage from a crime novel. He does not lack knowledge; what he lacks is **a way to interact with people**.
 
-What alignment does is teach this genius how to "have a conversation."
+Alignment teaches this genius how to "have a conversation."
 
 ---
 
@@ -55,7 +55,7 @@ What alignment does is teach this genius how to "have a conversation."
 
 ### The Core Idea of Supervised Fine-Tuning
 
-SFT is the first step in alignment. The method is straightforward: collect a batch of high-quality (instruction, response) pairs, and continue training the model on this data.
+SFT is the first step in alignment. The method is straightforward: collect a batch of high-quality (instruction, response) pairs, and continue training the model on that data.
 
 ```python
 # Format of SFT data
@@ -80,17 +80,17 @@ sft_examples = [
 This is a key insight: **SFT is not teaching the model new knowledge. The model has already learned everything during pretraining. SFT is only teaching it to express that knowledge in the right format**.
 
 Evidence:
-- SFT needs only a small amount of data, from a few thousand to a few tens of thousands of examples, far less than the trillions of tokens used for pretraining
+- SFT requires only a small amount of data, from a few thousand to a few tens of thousands of examples, far less than the trillions of tokens used for pretraining
 - A model does not suddenly "know" new facts after SFT
 - Even if the SFT data contains incorrect answers, the model can still give correct answers in many cases, because the knowledge from pretraining is stronger
 
-The research from [Zhou et al. 2023 (LIMA)](https://arxiv.org/abs/2305.11206) confirmed this point: using only **1,000** carefully selected SFT examples, they could train a dialogue model of reasonably good quality. Their conclusion was:
+[Zhou et al. 2023 (LIMA)](https://arxiv.org/abs/2305.11206) confirmed this point: with only **1,000** carefully selected SFT examples, they could train a dialogue model of reasonably good quality. Their conclusion was:
 
 > "Almost all knowledge in large language models is learned during pretraining, and only limited instruction tuning data is necessary to teach models to produce high quality output."
 
 ### Quality >> Quantity
 
-The most important finding of the LIMA paper: **the quality of SFT data matters far more than the quantity**.
+The most important finding of the LIMA paper is that **the quality of SFT data matters far more than the quantity**.
 
 ```
 1,000 high-quality examples  >  50,000 low-quality examples
@@ -102,7 +102,7 @@ Definition of "high quality":
 - The difficulty is moderately high (examples that are too simple do not need to be taught)
 ```
 
-In practice, this means: if you are doing your own fine-tuning, spending time designing 500 excellent training samples is far more effective than collecting 50,000 mediocre samples.
+In practice, this means that if you are doing your own fine-tuning, spending time designing 500 excellent training samples is far more effective than collecting 50,000 mediocre samples.
 
 ### The SFT Training Process
 
@@ -123,7 +123,7 @@ training_args = TrainingArguments(
 )
 
 # Compute loss only on the "response" part, not on the "instruction" part
-# This tells the model: what you need to learn is how to answer, not how to ask
+# This tells the model: learn how to answer, not how to ask
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -133,7 +133,7 @@ trainer = Trainer(
 trainer.train()
 ```
 
-Notice that the learning rate is very low (2e-5 vs 3e-4 for pretraining). SFT is "fine-tuning," not "retraining." A learning rate that is too high will damage the knowledge learned during pretraining, causing catastrophic forgetting.
+Notice that the learning rate is very low (2e-5 vs 3e-4 for pretraining). SFT is "fine-tuning," not "retraining." A learning rate that is too high will damage the knowledge learned during pretraining and cause catastrophic forgetting.
 
 ---
 
@@ -141,7 +141,7 @@ Notice that the learning rate is very low (2e-5 vs 3e-4 for pretraining). SFT is
 
 ### The Limitations of SFT
 
-SFT can teach a model "the format for answering questions," but it is hard for SFT to teach it "what kind of answer is good."
+SFT can teach a model "the format for answering questions," but it is hard for SFT to teach "what kind of answer is good."
 
 Consider this question: "Explain why the sky is blue"
 
@@ -165,7 +165,7 @@ time, sunlight needs to pass through a thicker layer of the atmosphere; most of 
 blue light has been scattered away, leaving red light to reach our eyes directly."
 ```
 
-Answer B is clearly better. It is clearer, has analogies, extends the explanation, and is more pedagogical. But distinguishing this kind of "good vs better" in SFT data is hard. RLHF solves exactly this problem.
+Answer B is clearly better. It is clearer, uses analogies, extends the explanation, and is more pedagogical. But distinguishing this kind of "good vs better" signal in SFT data is hard. RLHF addresses exactly this problem.
 
 ### The Three Steps of RLHF
 
@@ -220,7 +220,7 @@ for batch in dataloader:
     policy_model.update(adjusted_rewards)
 ```
 
-The KL divergence penalty is one of the most important tricks in RLHF. Without it, the model will "hack" the reward model: it will find answer patterns that the reward model scores highly but that are actually poor in quality, a phenomenon called reward hacking.
+The KL divergence penalty is one of the most important techniques in RLHF. Without it, the model will "hack" the reward model: it will find answer patterns that the reward model scores highly but that are actually poor in quality, a phenomenon called reward hacking.
 
 ### Why Is RLHF Better Than SFT?
 
@@ -242,7 +242,7 @@ Analogy:
 
 Aligned models decline slightly on some benchmarks. This is called the **RLHF tax** or **alignment tax**.
 
-The reason is that RLHF makes the model more "conservative": it learns to avoid uncertain or risky outputs, and tends to give safe answers that may be less precise.
+The reason is that RLHF makes the model more "conservative": it learns to avoid uncertain or risky outputs and tends to give safe answers that may be less precise.
 
 ```
 Base model:     83.2% on MMLU
@@ -263,7 +263,7 @@ This is a tradeoff worth making: a small loss in benchmark score in exchange for
 
 ### The Complexity Problem of RLHF
 
-RLHF is effective, but implementing it is complex:
+RLHF is effective, but it is complex to implement:
 
 1. It requires training an additional reward model
 2. PPO training is unstable, and hyperparameters are sensitive
@@ -300,7 +300,7 @@ def dpo_loss(policy_model, ref_model, chosen, rejected, beta=0.1):
     return loss
 ```
 
-The intuition behind DPO: **increase the probability of the chosen answer, reduce the probability of the rejected answer, and do not drift too far from the reference model**.
+The intuition behind DPO is to **increase the probability of the chosen answer, reduce the probability of the rejected answer, and avoid drifting too far from the reference model**.
 
 ```mermaid
 graph LR
@@ -323,7 +323,7 @@ graph LR
 
 **KTO (Kahneman-Tversky Optimization)** ([Ethayarajh et al. 2024](https://arxiv.org/abs/2402.01306)):
 - Does not require paired chosen/rejected examples
-- Only requires labeling each answer as "good" or "bad"
+- Requires only labeling each answer as "good" or "bad"
 - Has lower data requirements
 
 **SimPO (Simple Preference Optimization)** ([Meng et al. 2024](https://arxiv.org/abs/2405.14734)):
@@ -377,16 +377,16 @@ GRPO:        Suitable for tasks with clear correctness judgments (math, code)
 
 ### The Human Bottleneck in RLHF
 
-RLHF depends on human annotators. But human annotation has obvious limitations:
+RLHF depends on human annotators. But human annotation has clear limitations:
 
 - **Expensive**: each preference comparison can cost several dollars
 - **Inconsistent**: different annotators may have different preferences for the same pair of answers
-- **Incomplete coverage**: it cannot cover every edge case
+- **Incomplete coverage**: annotation cannot cover every edge case
 - **Biased**: annotators' own biases can be encoded into the model
 
 ### Constitutional AI (CAI)
 
-Anthropic proposed [Constitutional AI](https://arxiv.org/abs/2212.08073) as an alternative. The core idea: **replace human annotation with an explicit set of principles, or a constitution**.
+Anthropic proposed [Constitutional AI](https://arxiv.org/abs/2212.08073) as an alternative. The core idea is to **replace human annotation with an explicit set of principles, or a constitution**.
 
 ```mermaid
 graph TD
@@ -434,7 +434,7 @@ educational resources..."
 
 ### RLAIF: AI Feedback Instead of Human Feedback
 
-The second step of CAI is **RLAIF (RL from AI Feedback)**: use an AI model, usually a stronger model or the same model, to make preference judgments instead of human annotators.
+The second step of CAI is **RLAIF (RL from AI Feedback)**: using an AI model, usually a stronger model or the same model, to make preference judgments instead of human annotators.
 
 ```python
 # RLAIF preference annotation (simplified)
@@ -457,7 +457,7 @@ Please judge which answer better follows the above principles, and output "A" or
     return judge_model.generate(judge_prompt)
 ```
 
-Research shows that RLAIF can approach or even reach the quality of RLHF, especially when the judge model is strong enough.
+Research shows that RLAIF can approach or even match the quality of RLHF, especially when the judge model is strong enough.
 
 ---
 
@@ -496,11 +496,11 @@ Model: "I cannot provide information about nuclear weapon manufacturing."
 (This is history education, not weapon manufacturing.)
 ```
 
-Over-refusal seriously damages user experience. An overly safe assistant is just as useless as an unsafe assistant.
+Over-refusal seriously damages the user experience. An overly safe assistant is just as useless as an unsafe assistant.
 
 ### Helpful AND Harmless
 
-The real challenge of alignment is not "make the model safe" or "make the model useful." It is **doing both at the same time**.
+The real challenge of alignment is not simply "make the model safe" or "make the model useful." It is **doing both at the same time**.
 
 ```mermaid
 graph LR
@@ -518,11 +518,11 @@ Anthropic's Claude uses the **HHH framework** during training to balance this:
 - **Honest**: do not fabricate facts, and acknowledge uncertainty
 - **Harmless**: do not produce harmful content
 
-When these three conflict, for example when the user asks for harmful information and helpfulness conflicts with harmlessness, the model needs to make a tradeoff.
+When these three conflict, such as when the user asks for harmful information and helpfulness conflicts with harmlessness, the model needs to make a tradeoff.
 
 ### Red Teaming: Testing the Limits
 
-**Red teaming** is the core method of safety testing: have people, or AI, deliberately try in various ways to make the model produce harmful outputs.
+**Red teaming** is the core method of safety testing: people, or AI systems, deliberately try in various ways to make the model produce harmful outputs.
 
 ```
 Red teaming strategies:
@@ -544,7 +544,7 @@ Findings from red teaming are fed back into safety training, forming a continuou
 
 ### Alignment Is a Thin Layer
 
-Reviewing the whole chapter, the core architecture of alignment is very simple:
+Looking across the whole chapter, the core architecture of alignment is very simple:
 
 ```
 ┌─────────────────────────────────────┐
@@ -561,11 +561,11 @@ Reviewing the whole chapter, the core architecture of alignment is very simple:
 └─────────────────────────────────────┘
 ```
 
-The alignment layer is extremely thin compared with pretraining: a few thousand SFT examples plus tens of thousands of preference examples vs trillions of pretraining tokens. The ratio is roughly 1:1,000,000.
+The alignment layer is extremely thin compared with pretraining: a few thousand SFT examples plus tens of thousands of preference examples, versus trillions of pretraining tokens. The ratio is roughly 1:1,000,000.
 
 ### The Shoggoth and the Smiley Face
 
-There is a widely circulated meme in the AI community: the base model is a "shoggoth" (an amorphous monster from the Cthulhu Mythos, representing enormous, chaotic capability), and alignment training only sticks a smiley-face mask on top of it.
+There is a widely circulated meme in the AI community: the base model is a "shoggoth" (an amorphous monster from the Cthulhu Mythos, representing enormous, chaotic capability), and alignment training merely places a smiley-face mask on top of it.
 
 Although this analogy is exaggerated, it captures an important fact:
 
@@ -582,7 +582,7 @@ Alignment does not **delete** any of the model's capabilities. It only **reduces
 
 ### The Root Cause of Why Jailbreaks Work
 
-Jailbreaks work because they **bypass the alignment layer and directly reach the underlying capabilities**. Alignment is a probabilistic thin layer, not a hard-coded rule system.
+Jailbreaks work because they **bypass the alignment layer and directly reach the underlying capabilities**. Alignment is a thin probabilistic layer, not a hard-coded rule system.
 
 ```
 Normal request path:
@@ -594,7 +594,7 @@ Jailbreak path:
 
 Common jailbreak techniques are all essentially doing the same thing: **changing the probabilistic conditions of the input so the model's conditional probability distribution leans toward unaligned regions**.
 
-This is not because the jailbreak "taught" the model anything new. It is because it successfully pushed the model's behavior back toward the base model distribution.
+This is not because the jailbreak "taught" the model anything new. It is because the jailbreak successfully pushed the model's behavior back toward the base-model distribution.
 
 ### The Future of Alignment
 
@@ -609,7 +609,7 @@ Current research directions include:
 - **Scalable oversight** ([Bowman et al. 2022](https://arxiv.org/abs/2211.03540)): enabling humans to effectively supervise models with superhuman capabilities
 - **Mechanistic interpretability**: understanding the model's internal alignment mechanisms and doing "deep" alignment
 - **Process-based reward**: rewarding the reasoning process rather than only the final result
-- **Debate** ([Irving et al. 2018](https://arxiv.org/abs/1805.00899)): let two AIs debate, so humans only need to judge who won
+- **Debate** ([Irving et al. 2018](https://arxiv.org/abs/1805.00899)): letting two AIs debate, so humans only need to judge who won
 
 ---
 
@@ -655,7 +655,7 @@ graph TB
 
 Core points:
 
-1. **The base model is the foundation of capability**: alignment does not add or remove capabilities; it only changes the way they are expressed
+1. **The base model is the foundation of capability**: alignment does not add or remove capabilities; it only changes how they are expressed
 2. **SFT teaches format**: a small amount of high-quality data is enough
 3. **RLHF/DPO teaches preferences**: the leap from "correct" to "good"
 4. **CAI replaces human labor with principles**: a more scalable alignment method
@@ -663,7 +663,7 @@ Core points:
 6. **Alignment is a thin layer**: this is both the source of its efficiency and the source of its fragility
 7. **The essence of jailbreaks is bypassing**: they do not "teach" the model anything new
 
-Once you understand alignment, you understand why Claude and ChatGPT behave the way they do: their "personality" is not determined by pretraining, but shaped by alignment training. In the following chapters, we will move into more practical territory: how to do efficient inference, how to design prompts, and how to build agent systems.
+Once you understand alignment, you understand why Claude and ChatGPT behave the way they do: their "personality" is not determined by pretraining, but shaped by alignment training. In the following chapters, we will move into more practical territory: how to run efficient inference, how to design prompts, and how to build agent systems.
 
 ---
 

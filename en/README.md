@@ -1,12 +1,12 @@
 # Thinking in LLM
 
-> Starting from the essence of next-token prediction, understand the thinking mechanism of LLMs and master the first principles for building LLM systems.
+> A first-principles guide to how LLMs "think," starting from next-token prediction and ending with practical system design.
 
 **Languages**: [中文](../README.md) | [English](README.md)
 
 **Glossary**: [English terminology](GLOSSARY.md)
 
-For engineers who have a programming background and are using, or want to use, LLMs to build products. No machine learning background is required.
+For engineers who can program and are using, or want to use, LLMs to build products. No machine learning background is required.
 
 ## The Logic of This Book
 
@@ -55,9 +55,9 @@ flowchart LR
     style P4 fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c
 ```
 
-**Core logic**: first understand how LLMs "think" -> then know their boundaries -> then build based on the correct understanding -> finally look at frontier directions.
+**Core logic**: understand how LLMs "think" -> understand their boundaries -> build from the right mental model -> then look at the frontier.
 
-The market is full of either pure theory, such as papers, or pure practice, such as prompt cookbooks. This book derives **"how to do it" from "why"**. Once you understand the essence of attention, you naturally know what kind of prompt is effective. Once you understand scaling laws, you naturally know when to switch to a larger model instead of tuning the prompt.
+Most material is either pure theory, such as papers, or pure practice, such as prompt cookbooks. This book derives **"how to do it" from "why it works"**. Once you understand attention, you can reason about what makes a prompt effective. Once you understand scaling laws, you can reason about when to switch to a larger model instead of tuning the prompt.
 
 ## Table of Contents
 
@@ -67,7 +67,7 @@ The market is full of either pure theory, such as papers, or pure practice, such
 |---|---------|---------------|
 | 1 | [Everything Is Continuation](chapters/01-next-token.md) | An LLM does only one thing: predict the next token |
 | 2 | [Attention Is Information Routing](chapters/02-attention.md) | Every token asks, "Where should I look?" |
-| 3 | [Scale Emerges](chapters/03-scaling.md) | Why do large models suddenly "get it"? |
+| 3 | [Emergence From Scale](chapters/03-scaling.md) | Why do large models suddenly "get it"? |
 | 4 | [From Pretraining to Alignment](chapters/04-alignment.md) | Alignment does not change capability, only expression |
 
 ### Part II: The Capability Boundaries of LLMs (The Boundaries)
@@ -100,12 +100,12 @@ The market is full of either pure theory, such as papers, or pure practice, such
 
 | | [Training Guide](https://github.com/yingwang/llm-tutorial) | Thinking in LLM |
 |---|---|---|
-| **Perspective** | How to **make** LLMs | How to **understand and use** LLMs |
+| **Perspective** | How to **build** LLMs | How to **understand and use** LLMs |
 | **Reader** | Training engineers | All LLM developers |
 | **Prerequisite** | Requires ML background | Only requires programming background |
-| **Goal** | Be able to train models | Be able to design LLM systems |
+| **Goal** | Train models | Design LLM systems |
 
-The two books complement each other: the training guide teaches you how to build the engine; this book teaches you how to drive - not as a driving-school manual, but as driving after understanding the engine's principles.
+The two books complement each other: the training guide teaches you how to build the engine; this book teaches you how to drive. Not as a driving-school manual, but as driving after understanding how the engine works.
 
 ## How to Read
 

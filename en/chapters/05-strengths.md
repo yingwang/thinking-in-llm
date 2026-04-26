@@ -8,9 +8,9 @@
 
 In the first four chapters, we unpacked the internal mechanisms of LLMs: next-token prediction, attention, scaling, and alignment. Now it is time to answer a practical question: **what exactly are LLMs good at?**
 
-This is not an academic question. When you design an LLM system, the system can work reliably only if you put the model on tasks it is good at. Conversely, if you ask an LLM to do things it is naturally bad at (which the next chapter will discuss in detail), no amount of prompt engineering can save you.
+This is not a purely academic question. When you design an LLM system, it can work reliably only if you assign the model tasks it is good at. Conversely, if you ask an LLM to do things it is naturally bad at (which the next chapter will discuss in detail), no amount of prompt engineering can save you.
 
-The core argument of this chapter is: **LLM strengths come directly from the way they are trained**. Once you understand "why they are good at it," you can judge whether an LLM applies to a new scenario instead of relying on trial and error.
+The core argument of this chapter is: **LLM strengths come directly from the way they are trained**. Once you understand "why they are good at it," you can judge whether an LLM fits a new scenario instead of relying on trial and error.
 
 ---
 
@@ -25,7 +25,7 @@ What has a model trained on trillions of tokens seen?
 - Millions of papers, books, and news articles
 - Countless forum discussions, technical blogs, and Stack Overflow answers
 
-But what an LLM learns is not the "content" of these texts. It learns **patterns** -- statistical relationships between tokens.
+But an LLM does not learn the "content" of these texts in the usual sense. It learns **patterns** -- statistical relationships between tokens.
 
 For example, a model has seen tens of thousands of Python function definitions:
 
@@ -34,7 +34,7 @@ def calculate_area(radius):
     return 3.14159 * radius ** 2
 ```
 
-What it learns is not the knowledge point that "the area formula for a circle is πr²." What it learns is:
+It does not learn the fact that "the area formula for a circle is πr²" as a discrete knowledge point. It learns patterns such as:
 
 1. `def` is followed by a function name and parameters
 2. `return` is followed by an expression
@@ -45,9 +45,9 @@ When these patterns are layered together, the model can "write" correct code, ev
 
 ### Not Memorization, but Generalization
 
-A common misconception is that LLMs are just reciting training data.
+A common misconception is that LLMs are merely reciting training data.
 
-If it were pure memorization, a model should only be able to repeat code it has seen before. But in practice, you can give the model a requirement it has never seen, and it can combine existing patterns to generate entirely new code.
+If this were pure memorization, a model would only be able to repeat code it had seen before. In practice, you can give the model a requirement it has never seen, and it can combine existing patterns to generate entirely new code.
 
 ```python
 # Your request: "Write a function that takes a sentence and returns an acronym
@@ -76,9 +76,9 @@ For example, if you ask, "Explain Git using database concepts," the model can ge
 - merge = join
 - conflict = constraint violation
 
-This is not because the model "understands" Git and databases. It is because explanatory analogy texts contain many co-occurrence patterns in the training data, and the model has learned this mapping structure of "A corresponds to B."
+This is not because the model "understands" Git and databases. It is because the training data contains many co-occurrence patterns from explanatory analogies, and the model has learned the mapping structure "A corresponds to B."
 
-**Practical implication**: When you need an LLM to perform analogical reasoning, knowledge transfer, or generalization from examples, it usually performs well -- because this is exactly the core ability trained from trillions of tokens.
+**Practical implication**: When you need an LLM to perform analogical reasoning, knowledge transfer, or generalization from examples, it usually performs well -- because this is exactly the core ability trained on trillions of tokens.
 
 ---
 
@@ -86,7 +86,7 @@ This is not because the model "understands" Git and databases. It is because exp
 
 ### The Sweet Spot of LLMs: Mapping
 
-If one word could summarize the most reliable capability of LLMs, it would be **mapping**. Converting one representation into another.
+If one word could summarize the most reliable capability of LLMs, it would be **mapping**: converting one representation into another.
 
 ```
 Natural language → SQL
@@ -122,7 +122,7 @@ ORDER BY total_sales DESC
 LIMIT 10;
 ```
 
-The model can do this not because it "understands" SQL semantics, but because it has seen hundreds of thousands of similar natural-language-to-SQL correspondences. The pattern "top N highest" → `ORDER BY ... DESC LIMIT N` has been deeply encoded in its weights.
+The model can do this not because it "understands" SQL semantics, but because it has seen hundreds of thousands of similar natural-language-to-SQL correspondences. The pattern "top N highest" → `ORDER BY ... DESC LIMIT N` is deeply encoded in its weights.
 
 ### Example: Structured Data Extraction
 
@@ -149,7 +149,7 @@ This kind of conversion from unstructured to structured data is one of the most 
 
 ### Why Structured Output Is So Effective
 
-Recall the content of Chapter 1: the essence of an LLM is generating the most likely continuation in token space. When you require output in JSON format, you are effectively using format constraints to greatly narrow the possible output space.
+Recall Chapter 1: the essence of an LLM is generating the most likely continuation in token space. When you require output in JSON format, you use format constraints to greatly narrow the possible output space.
 
 ```mermaid
 flowchart LR
@@ -171,11 +171,11 @@ The stronger the constraints, the easier it is for the model to "find" the corre
 
 ### Compression Is Understanding
 
-Chapter 1 said that the essence of next-token prediction is compression. A model that can accurately predict the next token must understand what is important in the text and what is redundant.
+Chapter 1 said that the essence of next-token prediction is compression. A model that can accurately predict the next token must represent what is important in the text and what is redundant.
 
 This means **summarization and information extraction are direct products of the LLM training objective**.
 
-Think about it: to predict the next paragraph of a news report, the model must understand the main points of the preceding paragraphs. To predict the conclusion of a paper, the model must understand the core argument of the full text. This ability to "understand the main points" is a byproduct of training.
+Think about it: to predict the next paragraph of a news report, the model must capture the main points of the preceding paragraphs. To predict the conclusion of a paper, the model must capture the core argument of the full text. This ability to "understand the main points" is a byproduct of training.
 
 ### Extraction vs. Generation: Reliability Differences
 
@@ -217,7 +217,7 @@ Question: "What was Apple's Q3 2024 revenue?"
 → It may be accurate, or it may hallucinate
 ```
 
-**Practical implication**: Turn generation tasks into extraction tasks whenever possible. First use RAG to retrieve relevant documents, then let the LLM extract the answer from those documents, instead of asking the LLM to answer from thin air.
+**Practical implication**: Turn generation tasks into extraction tasks whenever possible. First use RAG to retrieve relevant documents, then let the LLM extract the answer from those documents, instead of asking it to answer from thin air.
 
 ### Levels of Summarization
 
@@ -231,7 +231,7 @@ LLMs can summarize at different granularities:
 | Paragraph | Structured summary | Background + method + conclusion |
 | Detailed | Comprehensive summary | An abbreviated version that preserves the main details |
 
-Each level is doing information compression -- retaining important information and discarding redundant information. This is exactly what LLMs are trained to do.
+Each level performs information compression -- retaining important information and discarding redundant information. This is exactly what LLMs are trained to do.
 
 ---
 
@@ -239,7 +239,7 @@ Each level is doing information compression -- retaining important information a
 
 ### A Few Examples Are Enough
 
-Few-shot learning is one of the most impressive abilities of LLMs: you do not need to fine-tune the model; you only need to provide a few examples in the prompt, and the model can learn a new task.
+Few-shot learning is one of the most impressive abilities of LLMs: you do not need to fine-tune the model. You only need to provide a few examples in the prompt, and the model can learn a new task.
 
 ```python
 prompt = """
@@ -257,7 +257,7 @@ Classification:
 # Model output: "positive" (or "positive, with some reservations")
 ```
 
-What happened here? We did not modify any model weights or do any training. We only gave two examples in the prompt, and the model "learned" a classification task.
+What happened here? We did not modify any model weights or perform any training. We only gave two examples in the prompt, and the model "learned" a classification task.
 
 ### From 0-shot to Few-shot: Diminishing Returns
 
@@ -278,15 +278,15 @@ graph LR
 | 1-shot | Significant improvement | The jump from 0 to 1 is the largest |
 | 3-shot | Continued improvement | Marginal gains begin to diminish |
 | 5-shot | Near saturation | Most tasks stabilize here |
-| 10+ shot | Slight improvement | Uses context space, with very small gains |
+| 10+ shots | Slight improvement | Uses context space, with very small gains |
 
-The key insight: **the improvement from 0 to 1 is much greater than the improvement from 5 to 10**. This is because the first example helps the model understand the task's **format** and **intent**; subsequent examples only fine-tune how it handles edge cases.
+The key insight: **the improvement from 0 to 1 is much greater than the improvement from 5 to 10**. This is because the first example helps the model understand the task's **format** and **intent**; subsequent examples mainly refine how it handles edge cases.
 
 ### The Task Specification Is in the Prompt, Not in the Weights
 
 One important implication of few-shot learning is: **the definition of the task can exist entirely in the prompt**.
 
-In traditional machine learning, you need to train a new model for each new task. With few-shot learning, the same LLM can become, through different prompts:
+In traditional machine learning, you need to train a new model for each new task. With few-shot learning, the same LLM can become different systems through different prompts:
 
 ```
 A few sentiment analysis examples → sentiment classifier
@@ -295,7 +295,7 @@ A few code examples → code generator
 A few summarization examples → summarizer
 ```
 
-This completely changes the architecture of ML systems: no longer "one task, one model," but "one model, countless prompts."
+This changes the architecture of ML systems completely: no longer "one task, one model," but "one model, countless prompts."
 
 ```mermaid
 flowchart TD
@@ -319,7 +319,7 @@ flowchart TD
 
 ## 5.5 The Nature of In-Context Learning
 
-Few-shot learning has a more academic name: **in-context learning** (ICL). The model "learns" from examples in the context, rather than from gradient updates.
+Few-shot learning has a more academic name: **in-context learning** (ICL). The model "learns" from examples in the context rather than from gradient updates.
 
 But there is a deeper question here: **how exactly does ICL work?**
 
@@ -329,7 +329,7 @@ Akyurek et al. (2022), in [_What Learning Algorithm Is In-Context Learning? Inve
 
 > The forward pass of a Transformer is actually **implicitly performing gradient descent**.
 
-Specifically, when the model processes few-shot examples, the computation in attention layers is equivalent to performing several gradient updates on an internal linear model. The examples are like training data, and the forward pass is like the training process.
+Specifically, when the model processes few-shot examples, the computation in attention layers is equivalent to performing several gradient updates on an internal linear model. The examples act like training data, and the forward pass acts like the training process.
 
 ```
 Traditional learning: data → training loop (multiple gradient descent steps) → update weights → prediction
@@ -348,13 +348,13 @@ In Bayesian terms:
 P(task | examples) ∝ P(examples | task) × P(task)
 ```
 
-The model's pretraining gives it a rich prior P(task), and the few-shot examples provide the likelihood P(examples | task). Combining the two gives a posterior -- the model "infers" what task you want.
+The model's pretraining gives it a rich prior P(task), and the few-shot examples provide the likelihood P(examples | task). Combining the two produces a posterior -- the model "infers" what task you want.
 
 ### Hypothesis 3: Complex Pattern Matching
 
-The third, and most conservative, explanation is that ICL is simply very complex pattern matching.
+The third and most conservative explanation is that ICL is simply very complex pattern matching.
 
-During training, the model has seen many "examples → conclusion" patterns (textbooks, FAQs, and programming tutorials all have this structure). When you provide examples in the prompt, the model is merely matching the most similar pattern it has seen and then continuing that pattern.
+During training, the model has seen many "examples → conclusion" patterns; textbooks, FAQs, and programming tutorials all have this structure. When you provide examples in the prompt, the model is matching the most similar pattern it has seen and then continuing that pattern.
 
 ### What Matters Most in Practice
 
@@ -387,7 +387,7 @@ The same examples, in different formats, can produce very different results. Thi
 
 **2. The order of examples has an effect**
 
-Research shows ([Lu et al., 2022: _Fantastically Ordered Prompts and Where to Find Them_](https://arxiv.org/abs/2104.08786)) that the ordering of few-shot examples can cause huge differences in accuracy, from near random to 90%+.
+Research shows ([Lu et al., 2022: _Fantastically Ordered Prompts and Where to Find Them_](https://arxiv.org/abs/2104.08786)) that the ordering of few-shot examples can cause large differences in accuracy, from near random to 90%+.
 
 General rules of thumb:
 - The last example has the greatest influence on the result (because it is closest to the target)
@@ -403,13 +403,13 @@ This is the most important conceptual shift:
 ✅ The model adjusted its behavior distribution based on the examples
 ```
 
-Examples do not change the model's weights or make the model "learn" anything new. They merely change the model's current conditional probability distribution -- like adding filters to a search engine, not feeding it new data.
+Examples do not change the model's weights or make the model "learn" anything new. They only change the model's current conditional probability distribution -- like adding filters to a search engine, not feeding it new data.
 
 ---
 
 ## 5.6 Experiment: Same Task, Varying Shots
 
-Let us use a concrete experiment to verify the theory above.
+Let us use a concrete experiment to examine the theory above.
 
 ### Experimental Design
 
@@ -519,7 +519,7 @@ format_c = """
 {{"text": "{text}", "sentiment": """"
 ```
 
-In actual experiments, format A usually performs best because it separates input and output most clearly, making this pattern easier for the model to match.
+In actual experiments, format A usually performs best because it separates input and output most clearly, making the pattern easier for the model to match.
 
 ### Order Comparison Experiment
 
@@ -558,13 +558,13 @@ for order, result in results.items():
 |------|-----------|---------|
 | 0-shot | 60-75% | Can do it, but handles edge cases poorly |
 | 1-shot | 75-85% | The jump from 0 to 1 is the largest |
-| 5-shot | 85-92% | Continues to improve, but with diminishing margins |
+| 5-shot | 85-92% | Continues to improve, but with diminishing returns |
 | Format A vs B | 5-15% gap | Structured formats clearly outperform narrative formats |
 | Best order vs worst order | 10-20% gap | Order matters more than most people expect |
 
 ### Key Conclusions
 
-1. **1-shot is the highest-ROI investment**: if you can provide only one example, its benefit is far greater than the following examples.
+1. **1-shot is the highest-ROI investment**: if you can provide only one example, its benefit is far greater than that of the following examples.
 
 2. **Format matters more than content**: good format + ordinary examples > poor format + good examples.
 
@@ -580,14 +580,14 @@ The core strength of LLMs can be reduced to one sentence: **an LLM is an extreme
 
 | Tasks LLMs are good at | Why they are good at them | Typical applications |
 |-----------|-----------|---------|
-| Pattern recognition and analogy | They learned rich patterns from trillions of tokens | Code generation, Q&A, creative writing |
+| Pattern recognition and analogy | They learn rich patterns from trillions of tokens | Code generation, Q&A, creative writing |
 | Translation and format conversion | The training data contains many parallel correspondences | NL→SQL, JSON conversion, multilingual translation |
 | Summarization and information extraction | Compression is a direct product of the training objective | Document summaries, entity extraction, structured data extraction |
-| Few-shot Learning | ICL lets the same model adapt to countless tasks | Zero-shot/few-shot classification, format conversion |
+| Few-shot learning | ICL lets the same model adapt to countless tasks | Zero-shot/few-shot classification, format conversion |
 
 When designing LLM systems, follow this principle:
 
-> **Put the LLM where it is good -- pattern recognition, format conversion, and information extraction. Give the things it is not good at to tools.**
+> **Put the LLM where it is strong -- pattern recognition, format conversion, and information extraction. Give the things it is not good at to tools.**
 
 In the next chapter, we will look at the hard limitations of LLMs -- problems that cannot be solved no matter how much you tune the prompt.
 

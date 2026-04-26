@@ -7,9 +7,9 @@
 > "Attention is all you need."
 > — Vaswani et al., 2017
 
-The name "attention" is misleading. When we say "attention mechanism," you might picture human concentration: focusing on one thing and ignoring the rest. But attention in a Transformer is more like an **information-routing network**: every token asks, "Where do I need to get information from?" and then **reads on demand** from the entire sequence.
+The name "attention" is misleading. When we say "attention mechanism," you might picture human concentration: focusing on one thing while ignoring the rest. But attention in a Transformer is more like an **information-routing network**: every token asks, "Where do I need to get information from?" and then **reads on demand** from the entire sequence.
 
-Understand attention, and you understand the core of the Transformer, which means you understand the "brain structure" of modern LLMs.
+Understand attention, and you understand the core of the Transformer, which means you understand the core architecture of modern LLMs.
 
 ---
 
@@ -17,13 +17,13 @@ Understand attention, and you understand the core of the Transformer, which mean
 
 ### The RNN Bottleneck: Everything Passes Through One Narrow Gate
 
-Before Transformers, the main workhorse for sequence modeling was the RNN (recurrent neural network). An RNN works like a pipeline:
+Before Transformers, the main workhorse for sequence modeling was the RNN (recurrent neural network). An RNN processes tokens like a pipeline:
 
 ```
 token_1 → [h₁] → token_2 → [h₂] → token_3 → [h₃] → ... → token_n → [hₙ]
 ```
 
-All historical information is compressed into a fixed-size hidden vector $h$. To pass information from token_1 to token_1000, that information must go through 999 compression steps. Imagine playing a telephone game through 999 people. How much of the original information would still remain at the end?
+All past information is compressed into a fixed-size hidden vector $h$. To pass information from token_1 to token_1000, that information must go through 999 compression steps. Imagine playing a telephone game through 999 people. How much of the original information would still remain at the end?
 
 This is the famous **long-range dependency problem**. LSTMs and GRUs alleviated it, but they did not fundamentally solve it.
 
@@ -47,9 +47,9 @@ graph LR
     end
 ```
 
-Does token_1000 want to know what token_1 said? It reads it directly, with no need to pass through the 998 people in between.
+If token_1000 needs to know what token_1 said, it reads it directly, with no need to pass through the 998 tokens in between.
 
-The cost is **O(n²)** computational complexity: with n tokens, an attention weight must be computed for every pair. This is why context windows cannot be infinitely large: processing a 100K-token text requires computing 100K × 100K = 10 billion attention scores.
+The cost is **O(n²)** computation: with n tokens, an attention score must be computed for every pair. This is why context windows cannot be infinitely large: processing a 100K-token sequence requires computing 100K × 100K = 10 billion attention scores.
 
 ---
 
@@ -59,17 +59,17 @@ The core of the attention mechanism is three vectors produced by three projectio
 
 ### Intuition: A Database Query
 
-The best analogy is a database query:
+A useful analogy is a database query:
 
 ```sql
 SELECT value FROM memory WHERE key MATCHES query
 ```
 
 - **Q (Query)**: What information am I looking for?
-- **K (Key)**: What information do I have available to provide?
-- **V (Value)**: If you need my information, here is the actual content.
+- **K (Key)**: What information do I have available?
+- **V (Value)**: If you need my information, here is the content itself.
 
-Every token plays all three roles at once: it uses its own Q to query others, uses its own K to be queried by others, and uses its own V to provide information to whoever matches it.
+Every token plays all three roles at once: it uses its own Q to query other tokens, its own K so other tokens can query it, and its own V to provide information to any token whose query matches it.
 
 ### The Computation
 
@@ -106,13 +106,13 @@ Let's break down each step:
 
 **Step 1: Compute the "match score"**
 
-The dot product of Q and K measures the "relevance" between two tokens. The larger the dot product, the more closely what Q is looking for matches what K can provide.
+The dot product of Q and K measures the "relevance" between two tokens. The larger the dot product, the more closely Q's request matches what K can provide.
 
-Why divide by $\sqrt{d_k}$? To prevent the dot product values from becoming too large, which would make the softmax output nearly one-hot and cause gradients to vanish. This is what is known as **Scaled Dot-Product Attention**.
+Why divide by $\sqrt{d_k}$? To prevent the dot product values from becoming too large, which would make the softmax output nearly one-hot and cause gradients to vanish. This is known as **Scaled Dot-Product Attention**.
 
 **Step 2: Causal Mask**
 
-In a language model (decoder), a token cannot see future tokens, or it would be cheating. The causal mask is a lower-triangular matrix:
+In a language model (decoder), a token cannot see future tokens, because that would leak the answer. The causal mask is a lower-triangular matrix:
 
 ```
      t₁  t₂  t₃  t₄
@@ -130,7 +130,7 @@ Softmax turns match scores into a probability distribution. Each token allocates
 
 **Step 4: Weighted Reading**
 
-Use the attention weights to compute a weighted sum of V. If token_5 gives token_2 an attention weight of 0.7 and token_1 a weight of 0.2, then token_5's output gets 70% of its information from token_2 and 20% from token_1.
+The attention weights are used to compute a weighted sum of V. If token_5 gives token_2 an attention weight of 0.7 and token_1 a weight of 0.2, then token_5's output gets 70% of its information from token_2 and 20% from token_1.
 
 ### The Complete Self-Attention Flow
 
@@ -151,13 +151,13 @@ graph TB
     MUL --> OUT["Output"]
 ```
 
-The key insight: **Q, K, and V are all obtained from the same input X through learnable linear transformations**. By learning the three weight matrices $W_Q$, $W_K$, and $W_V$, the model decides "what information is worth querying," "what information is worth indexing," and "what information is worth passing along."
+The key insight: **Q, K, and V are all derived from the same input X through learnable linear transformations**. By learning the three weight matrices $W_Q$, $W_K$, and $W_V$, the model decides "what information is worth querying," "what information is worth indexing," and "what information is worth passing along."
 
 ---
 
 ## 2.3 Multi-Head Attention: Many Pairs of Eyes
 
-A single set of QKV can capture only one "relationship pattern." The idea of multi-head attention is: **use multiple sets of QKV in parallel, with each set capturing a different type of relationship**.
+A single set of QKV can capture only one "relationship pattern." Multi-head attention works by **using multiple sets of QKV in parallel, with each set capturing a different type of relationship**.
 
 ```python
 class MultiHeadAttention(torch.nn.Module):
@@ -193,7 +193,7 @@ class MultiHeadAttention(torch.nn.Module):
 
 ### What Do Different Heads See?
 
-Research has found ([Clark et al. 2019](https://arxiv.org/abs/1906.04341)) that different attention heads do indeed learn to focus on different types of relationships:
+Research has found ([Clark et al. 2019](https://arxiv.org/abs/1906.04341)) that different attention heads often learn to focus on different types of relationships:
 
 - **Syntactic heads**: focus on subject-verb agreement (in "The dogs **are** running," "are" strongly attends to "dogs")
 - **Position heads**: focus on neighboring tokens (the previous word or next word)
@@ -201,7 +201,7 @@ Research has found ([Clark et al. 2019](https://arxiv.org/abs/1906.04341)) that 
 - **Separator heads**: focus on punctuation and sentence boundaries
 - **Rare-pattern heads**: focus on uncommon collocations
 
-It is like a reading-comprehension group: each member reads the same article from a different perspective, and then everyone's findings are synthesized.
+It is like a reading-comprehension group: each member reads the same article from a different perspective, and then the group synthesizes everyone's findings.
 
 ### Analogy
 
@@ -209,10 +209,10 @@ Imagine you are reading a complex sentence:
 
 > "The trophy doesn't fit in the brown suitcase because **it** is too big."
 
-Understanding this sentence requires tracking several relationships at once:
+Understanding this sentence requires tracking several relationships at the same time:
 - **Coreference**: What does "it" refer to? (head 1 handles this)
 - **Causality**: What does "because" connect? (head 2 handles this)
-- **Physical property**: What is "too big" describing? (head 3 handles this)
+- **Physical property**: What does "too big" describe? (head 3 handles this)
 - **Syntactic structure**: What is the subject? What is the predicate? (head 4 handles this)
 
 Multi-head attention lets the model route information along multiple dimensions at the same time.
@@ -223,9 +223,9 @@ Multi-head attention lets the model route information along multiple dimensions 
 
 ### What Is an Induction Head?
 
-[Olsson et al. 2022](https://arxiv.org/abs/2209.11895) discovered an attention pattern called an **induction head**, which may be the most basic "algorithm" learned by Transformers.
+[Olsson et al. 2022](https://arxiv.org/abs/2209.11895) identified an attention pattern called an **induction head**, which may be the most basic "algorithm" learned by Transformers.
 
-What an induction head does is simple:
+An induction head does something simple:
 
 > If `[A][B]` appeared before, then when `[A]` appears again, predict `[B]`.
 
@@ -260,11 +260,11 @@ The model identifies the pattern through an induction head:
 Prediction: "鸟"
 ```
 
-The model is not "understanding" the translation task; it is doing **pattern matching and completion**. But this pattern matching is powerful enough to handle very complex few-shot tasks.
+The model is not "understanding" the translation task; it is doing **pattern matching and completion**. But that pattern matching is powerful enough to handle very complex few-shot tasks.
 
 ### Two-Layer Cooperation
 
-An induction head actually requires cooperation between two attention heads:
+An induction head requires cooperation between two attention heads:
 
 ```mermaid
 graph TB
@@ -281,9 +281,9 @@ graph TB
 ```
 
 1. **First layer**: a "previous token head" learns to write information about "what the previous token was" into the residual stream
-2. **Second layer**: the induction head uses this information to find where the same pattern appeared before and read the following token
+2. **Second layer**: the induction head uses this information to find where the same pattern appeared before and to read the following token
 
-This is a beautiful example of **cross-layer information transfer** in a Transformer.
+This is a clear example of **cross-layer information transfer** in a Transformer.
 
 ---
 
@@ -291,7 +291,7 @@ This is a beautiful example of **cross-layer information transfer** in a Transfo
 
 ### Transformers Have No Concept of Position
 
-The attention computation is **permutation invariant**. If you shuffle the input tokens, attention's output is shuffled correspondingly, but the weight computation itself does not change.
+The attention computation is **permutation invariant**. If you shuffle the input tokens, attention's output is shuffled in the same way, but the weight computation itself does not change.
 
 This means that without positional encoding, a Transformer cannot distinguish:
 - "cat eats fish" and "fish eats cat"
@@ -300,7 +300,7 @@ because the two contain exactly the same set of tokens.
 
 ### RoPE: Encoding Position with Rotation
 
-The most mainstream positional encoding scheme today is **Rotary Position Embedding (RoPE)** ([Su et al. 2021](https://arxiv.org/abs/2104.09864)).
+The most widely used positional encoding scheme today is **Rotary Position Embedding (RoPE)** ([Su et al. 2021](https://arxiv.org/abs/2104.09864)).
 
 The core idea is to encode positional information as the **rotation angle** of a vector. The larger the distance between two tokens' positions, the larger the "rotation-angle difference" between their Q and K vectors.
 
@@ -336,7 +336,7 @@ def apply_rope(x, positions, d_model):
     return x_rotated.flatten(-2)
 ```
 
-What makes RoPE elegant:
+RoPE is elegant because:
 - The attention score between two positions depends only on their **relative distance**, not their absolute positions
 - In theory, it can extrapolate to longer sequences (although performance degrades in practice)
 - It is computationally efficient and requires no extra learnable parameters
@@ -372,11 +372,11 @@ Step 2: input [A, B, C, D]   → predict E
 Step 3: input [A, B, C, D, E] → predict F
 ```
 
-In Step 2, A, B, and C were already processed in Step 1. If they were recomputed every time, a large amount of computation would be wasted.
+In Step 2, A, B, and C have already been processed in Step 1. Recomputing them every time would waste a large amount of computation.
 
 ### KV Cache: Cache the Already-Computed K and V
 
-The key observation: during autoregressive generation, **the K and V of previous tokens do not change** (because the causal mask ensures they cannot see future tokens). So we can cache them:
+The key observation: during autoregressive generation, **the K and V of previous tokens do not change** (because the causal mask ensures they cannot see future tokens). That means we can cache them:
 
 ```python
 class CachedAttention:
@@ -438,7 +438,7 @@ For 128K context:
   128,000 × 2.5 MB = 320 GB — larger than the model itself!
 ```
 
-This is why long-context inference is so expensive: not because of computation, but because of **memory**.
+This is why long-context inference is so expensive: less because of computation than because of **memory**.
 
 ### PagedAttention: Managing KV Cache Like an Operating System
 
@@ -454,13 +454,13 @@ PagedAttention: split the KV cache into fixed-size pages
   → memory utilization improves by 2-4×
 ```
 
-This is not a purely academic optimization. It directly determines how many requests the same GPU can serve concurrently and affects inference cost.
+This is not a purely academic optimization. It directly determines how many requests the same GPU can serve concurrently, which affects inference cost.
 
 ---
 
 ## 2.7 Visualization: Seeing What Attention Looks At
 
-We have discussed a lot of theory. Now let us actually look at attention patterns.
+We have discussed a lot of theory. Now let us look directly at attention patterns.
 
 ### Visualizing with BertViz
 
@@ -495,7 +495,7 @@ head_view(attention, tokens)
    (Head 3, Layer 5 strongly focuses on the subject-verb relationship)
 ```
 
-Even when "in the park" separates "dogs" and "are," certain heads can precisely point the verb's attention to the subject.
+Even when "in the park" separates "dogs" and "are," certain heads can point the verb's attention precisely to the subject.
 
 **2. Coreference Resolution Head**
 
@@ -512,11 +512,11 @@ Some heads specialize in attending to neighboring positions (the previous token 
 
 **4. Separator Attention Head**
 
-Some heads place a large amount of attention on punctuation such as periods and commas. The conjecture is that punctuation carries sentence-boundary information.
+Some heads place a large amount of attention on punctuation such as periods and commas. One conjecture is that punctuation carries sentence-boundary information.
 
 ### An Interesting Finding
 
-In visualization studies of GPT-2, researchers found that heads in shallow layers (the first few layers) mainly perform local and syntactic attention, while heads in deeper layers perform more abstract and semantic attention. This matches intuition: the model first "parses" sentence structure, then "understands" meaning on top of that.
+In visualization studies of GPT-2, researchers found that heads in shallow layers (the first few layers) mainly perform local and syntactic attention, while heads in deeper layers perform more abstract and semantic attention. This matches intuition: the model first "parses" sentence structure, then builds an "understanding" of meaning on top of it.
 
 ---
 
@@ -543,7 +543,7 @@ graph TB
 
 Key points:
 
-1. **Attention = information routing**, not "attention": every token reads information on demand from the full sequence
+1. **Attention = information routing**, not human-like "attention": every token reads information on demand from the full sequence
 2. The **QKV triple** is the core of attention: Query looks for information, Key is matched, and Value provides content
 3. **Multi-head** lets the model track multiple relationship types at once
 4. **Induction heads** are the most basic mechanism of in-context learning
@@ -551,7 +551,7 @@ Key points:
 6. **KV cache** is the key optimization for inference efficiency, but its memory cost grows linearly with sequence length
 7. **The context window is a hard limit**: the model truly cannot see tokens outside the window
 
-In the next chapter, we will zoom out and see what happens when these modules are stacked to extreme scale: how scale changes everything.
+In the next chapter, we will zoom out and see what happens when these modules are stacked at extreme scale: how scale changes everything.
 
 ---
 

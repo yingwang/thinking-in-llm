@@ -1,10 +1,10 @@
 # Thinking in LLM - Outline
 
-> Starting from the essence of next-token prediction, understand the thinking mechanism of LLMs and master the first principles for building LLM systems.
+> A first-principles guide to how LLMs "think," starting from next-token prediction and ending with practical system design.
 
-**Target reader**: Engineers who have a programming background and are using, or want to use, LLMs. No ML background required.
+**Target reader**: Engineers who can program and are using, or want to use, LLMs. No ML background required.
 
-**Tone**: Like DDIA (Designing Data-Intensive Applications) - principled and deep, but always serving practice.
+**Tone**: Like DDIA (Designing Data-Intensive Applications): principled and deep, but always in service of practice.
 
 **Language**: Chinese and English bilingual (Chinese first, then English version).
 
@@ -29,16 +29,16 @@ Build the correct mental model from the bottom up. After reading this part, you 
 - KV Cache: why inference does not need to recompute history.
 - **Visualization**: use BertViz/attention patterns to see what the model is "looking" at.
 
-### Chapter 3: Scale Emerges
+### Chapter 3: Emergence From Scale
 - Scaling Laws: loss is a power-law function of parameter count and data size.
-- Emergent abilities: why something a 10B model cannot do can suddenly be done by a 100B model.
+- Emergent abilities: why a task a 10B model cannot handle may suddenly work with a 100B model.
 - Chinchilla law: the optimal ratio between model and data.
 - Over-training: why real training uses more data than the Chinchilla optimum.
-- Grokking: why a model can suddenly "understand" after training for a long time.
+- Grokking: why a model can suddenly generalize after training for a long time.
 - **Philosophical question**: Intelligence = compression? A larger compressor = more intelligent?
 
 ### Chapter 4: From Pretraining to Alignment
-- Base model capabilities and limitations: it can do many things, but it does not obey.
+- Base model capabilities and limitations: it can do many things, but it does not follow instructions reliably.
 - SFT: teaches format, not knowledge.
 - RLHF/DPO: teaches preferences and lets the model "choose" better answers.
 - Constitutional AI: replace human annotation with principles.
@@ -52,23 +52,23 @@ Build the correct mental model from the bottom up. After reading this part, you 
 Knowing what LLMs can do is important. Knowing what they **cannot** do is even more important.
 
 ### Chapter 5: What LLMs Are Truly Good At
-- Pattern recognition and analogy: after seeing enough code, the model can "write" code.
+- Pattern recognition and analogy: after seeing enough code, a model can "write" code.
 - Translation and transformation: mapping between formats is the sweet spot for LLMs.
 - Summarization and extraction: compressing information is a direct product of the training objective.
 - Few-shot learning: why a few examples are enough to learn a new task.
-- The essence of in-context learning: implicit gradient descent? Or Bayesian inference?
+- The nature of in-context learning: implicit gradient descent, or Bayesian inference?
 - **Experiment**: Compare 0-shot vs 1-shot vs 5-shot on the same task.
 
 ### Chapter 6: The Hard Limitations of LLMs
 - Counting goes wrong: the tokenizer breaks character boundaries.
-- Arithmetic is unreliable: it is not computation, but token-level pattern matching that "looks like an answer."
+- Arithmetic is unreliable: it is not computation, but token-level pattern matching that "looks like" an answer.
 - Long-range reasoning breaks: autoregressive generation has no global planning.
 - Time cutoff: knowledge is frozen in the training data.
-- Faithfulness hallucination: the model will always produce the "most likely continuation," even when it is fabricated.
+- Faithfulness hallucination: the model always produces the "most likely continuation," even when that continuation is fabricated.
 - **Key framework**: A checklist of reliable vs unreliable tasks.
 
 ### Chapter 7: The Nature of Hallucination
-- Hallucination is not a bug; it is a feature: the continuation engine must continue.
+- Hallucination is not a bug; it follows from the mechanism: the continuation engine must continue.
 - Knowledge hallucination vs reasoning hallucination vs instruction hallucination.
 - Calibration: does the model know what it does not know? (Partly.)
 - Detecting hallucination: self-consistency, multiple sampling, logprob analysis.
@@ -80,28 +80,28 @@ Knowing what LLMs can do is important. Knowing what they **cannot** do is even m
 - The essence of CoT: more tokens = more computation steps.
 - Reasoning models (o1/R1/Claude): internalized CoT.
 - Test-time compute scaling: trade inference time for accuracy.
-- Is the LLM "really reasoning," or "imitating the appearance of reasoning"?
+- Is the LLM "really reasoning," or is it "imitating the appearance of reasoning"?
 - **Open question**: System 1 vs System 2 thinking in LLMs.
 
 ---
 
 ## Part III: Building With LLMs (The Practice)
 
-Based on the understanding from the first two parts, derive the right way to build.
+The first two parts give us the mental model; this part derives the right way to build from it.
 
 ### Chapter 9: Prompt Is Programming
-- A prompt is not a natural-language instruction; it constructs a conditional probability scenario.
+- A prompt is not just a natural-language instruction; it constructs a conditional probability scenario.
 - System prompt = class definition, few-shot = unit tests, CoT = forced intermediate variables.
 - Structured output = type system: JSON mode, function calling, constrained decoding.
 - Prompt composability: templates, variables, conditional branches.
 - Why small changes can have very different effects: the butterfly effect in token space.
-- **Hands-on**: The full process of iterating from a bad prompt to a good prompt.
+- **Hands-on**: The full process of iterating from a bad prompt to a good one.
 
 ### Chapter 10: Three Paths for Knowledge Injection
 - RAG = open-book exam: runtime retrieval, real-time updates, auditable.
-- Fine-tuning = etched into the brain: changes behavior/format/style.
+- Fine-tuning = etched into the model: changes behavior, format, and style.
 - Long context = working memory: simple but expensive.
-- Decision framework: when to use which, and when to combine them.
+- Decision framework: when to use each method, and when to combine them.
 - The intuition of embeddings: semantic similarity = close vector distance.
 - Vector retrieval engineering: choosing an index, choosing a database, chunk strategy.
 - **Decision tree**: Given a scenario, choose the best knowledge-injection method.
@@ -110,7 +110,7 @@ Based on the understanding from the first two parts, derive the right way to bui
 - Tool use: not "letting AI use tools," but extending token space into the real world.
 - The fundamental difficulty of planning: autoregressive models do not have lookahead ability.
 - ReAct: thought -> action -> observation loop.
-- Reflection: let the model inspect its own output.
+- Reflection: letting the model inspect its own output.
 - Multi-agent: the benefit of division of labor and the cost of communication.
 - When to use an agent, and when a single prompt is enough.
 - **Counterintuitive**: The best agent designs are often the simplest.
@@ -168,8 +168,8 @@ Based on the understanding from the first two parts, derive the right way to bui
 
 | | The Complete Guide for LLM Training Engineers | Thinking in LLM |
 |---|---|---|
-| **Perspective** | How to **make** LLMs | How to **understand and use** LLMs |
+| **Perspective** | How to **build** LLMs | How to **understand and use** LLMs |
 | **Reader** | Training engineers | All LLM developers |
 | **Depth** | Engineering implementation details | Concepts and mental models |
-| **Goal** | Be able to train models | Be able to design LLM systems |
+| **Goal** | Train models | Design LLM systems |
 | **Prerequisite** | Requires ML background | Only requires programming background |

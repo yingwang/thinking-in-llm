@@ -1,6 +1,6 @@
 # English Glossary
 
-This glossary keeps the English edition consistent. Prefer these translations when editing or extending the English version.
+This glossary keeps the English edition consistent. Prefer these terms when editing or extending the English version.
 
 | 中文 | English | Notes |
 |---|---|---|
@@ -9,7 +9,7 @@ This glossary keeps the English edition consistent. Prefer these translations wh
 | 续写器 | continuation engine | The book's central metaphor for base LLM behavior. |
 | 下一个 token 预测 | next-token prediction | Keep "token" untranslated. |
 | 自回归生成 | autoregressive generation | Use for the generation loop that appends one token at a time. |
-| 基座模型 | base model | Avoid "foundation model" when specifically referring to the pretrained, non-instruction-tuned model. |
+| 基座模型 | base model | Avoid "foundation model" when referring specifically to the pretrained, non-instruction-tuned model. |
 | 对齐 | alignment | Use consistently for SFT/RLHF/DPO/safety shaping. |
 | 预训练 | pretraining | One word. |
 | 微调 | fine-tuning | Hyphenated. |
@@ -21,7 +21,7 @@ This glossary keeps the English edition consistent. Prefer these translations wh
 | 知识幻觉 | knowledge hallucination | One of the three hallucination types in Chapter 7. |
 | 推理幻觉 | reasoning hallucination | One of the three hallucination types in Chapter 7. |
 | 指令幻觉 | instruction hallucination | One of the three hallucination types in Chapter 7. |
-| 忠实性 | faithfulness | Use for whether output is grounded in provided evidence or actual execution. |
+| 忠实性 | faithfulness | Use when discussing whether output is grounded in provided evidence or actual execution. |
 | 硬伤 | hard limitations | Prefer this over "flaws" or "weaknesses" in chapter titles and summaries. |
 | 能力边界 | capability boundaries | Use when discussing where LLMs are reliable or unreliable. |
 | 模式识别 | pattern recognition | Core strength in Chapter 5. |

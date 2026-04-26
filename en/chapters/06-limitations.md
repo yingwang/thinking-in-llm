@@ -6,15 +6,15 @@
 
 > "It's not a bug, it's a ~~feature~~ fundamental architectural limitation."
 
-In the previous chapter, we saw the domains where LLMs excel. This chapter turns to the other side: **the things LLMs are inherently bad at**.
+In the previous chapter, we looked at the domains where LLMs excel. This chapter turns to the other side: **the things LLMs are inherently bad at**.
 
-These are not "problems that have not been solved yet" -- they are **architectural limitations**. If you understand the root causes of these limitations, you can:
+These are not "problems that have not been solved yet"; they are **architectural limitations**. If you understand their root causes, you can:
 
 1. Avoid wasting time on scenarios that are doomed to fail
-2. Design the right system architecture (let the LLM do what it is good at, and let tools do the rest)
+2. Design the right system architecture (let the LLM do what it is good at, and let tools handle the rest)
 3. Ask the right questions in interviews and reviews
 
-The core argument of this chapter: **every "hard limit" can be traced back to how LLMs are trained or how inference works**. Once you understand the root cause, the solution naturally emerges.
+The core argument of this chapter is: **every "hard limit" can be traced back to how LLMs are trained or how inference works**. Once you understand the root cause, the solution naturally follows.
 
 ---
 
@@ -29,7 +29,7 @@ GPT-4: 2.
 Correct answer: 3 (st-r-awbe-r-r-y)
 ```
 
-This question once sparked heated discussion online. People were surprised that such a "smart" model could fail to count letters correctly. But if you understand tokenizers, this error is not surprising at all.
+This question once sparked heated discussion online. People were surprised that such a "smart" model could fail to count letters correctly. But if you understand tokenizers, the error is not surprising.
 
 ### Root Cause: The Tokenizer Breaks Character Boundaries
 
@@ -44,16 +44,16 @@ print([enc.decode([t]) for t in tokens])
 # Possible output: ['str', 'aw', 'berry']
 ```
 
-When the model sees "strawberry", it does not see the 10 characters `s-t-r-a-w-b-e-r-r-y`; it sees the 3 tokens `str`-`aw`-`berry`.
+When the model sees "strawberry", it does not see the 10 characters `s-t-r-a-w-b-e-r-r-y`; it sees the three tokens `str`-`aw`-`berry`.
 
-**The model has never "seen" the individual character r.** What it sees are token fragments that contain r. To count the number of r's, the model needs to:
+**The model has never "seen" the individual character r.** It sees token fragments that contain r. To count the number of r's, the model needs to:
 
 1. Know that "str" contains one r
 2. Know that "aw" contains no r
 3. Know that "berry" contains two r's
 4. Add them together
 
-This requires the model to have precise knowledge of the characters inside tokens, but during training, tokens are the smallest unit. The model was not trained to analyze the internal structure of tokens.
+This requires precise knowledge of the characters inside tokens, but during training, tokens are the smallest unit. The model was not trained to analyze the internal structure of tokens.
 
 ```mermaid
 flowchart LR
@@ -77,7 +77,7 @@ flowchart LR
 def count_char(text, char):
     return text.count(char)
 
-# Or guide the model in the prompt to break the word down character by character
+# Or guide the model in the prompt to break down the word character by character
 prompt = """
 Please list each character in "strawberry" one by one, then count the number of r's.
 
@@ -87,7 +87,7 @@ Number of r's: 3
 """
 ```
 
-**Core principle**: For any task that requires character-level operations (counting, palindrome checks, word puzzles), do not trust the LLM's direct answer. Give it a code execution tool.
+**Core principle**: For any task that requires character-level operations (counting, palindrome checks, word puzzles), do not trust the LLM's direct answer. Give it access to a code execution tool.
 
 ---
 
@@ -111,13 +111,13 @@ Answer: 366,023,736 ✗ (the correct answer is 365,924,136)
 
 ### Root Cause: Pattern Matching Is Not Computation
 
-LLMs do not "calculate" mathematics. What they do is:
+LLMs do not "calculate" mathematics. Instead, they:
 
 1. See "7 + 5 ="
 2. In the training data, "7 + 5 = 12" has appeared countless times
 3. "12" is the most likely next token
 
-For small numbers, this kind of pattern matching gives the same result as real calculation. But for large numbers:
+For small numbers, this kind of pattern matching produces the same result as real calculation. But for large numbers:
 
 ```
 "7834 + 2917 = ?"
@@ -126,7 +126,7 @@ For small numbers, this kind of pattern matching gives the same result as real c
 → This is not calculation; it is guessing
 ```
 
-The deeper problem: **multi-digit arithmetic requires carrying, an algorithm that must be processed from right to left**. But autoregressive models generate from left to right. When the model generates the "ten-thousands" digit, it does not yet know what carries will arise from the later digits.
+The deeper problem: **multi-digit arithmetic requires carrying, an algorithm that must be processed from right to left**. But autoregressive models generate from left to right. When the model generates the "ten-thousands" digit, it does not yet know what carries will arise from the lower-order digits.
 
 ```mermaid
 flowchart LR
@@ -143,7 +143,7 @@ flowchart LR
     style model_generation fill:#ffcdd2
 ```
 
-Calculation needs to proceed from right to left (low-order digits to high-order digits), but token generation proceeds from left to right (high-order digits to low-order digits). This is a fundamental direction conflict.
+Calculation must proceed from right to left (low-order digits to high-order digits), but token generation proceeds from left to right (high-order digits to low-order digits). This is a fundamental directional conflict.
 
 ### Reliability Curve
 
@@ -190,7 +190,7 @@ tools = [{
 }]
 ```
 
-**Core principle**: Any task that requires an exact numerical result should be handed to a code executor or calculator tool, not to the LLM's direct reasoning.
+**Core principle**: Any task that requires an exact numerical result should be handed to a code executor or calculator tool, not left to the LLM's direct reasoning.
 
 ---
 
@@ -198,14 +198,14 @@ tools = [{
 
 ### The Fatal Flaw of Autoregressive Generation: No Way Back
 
-When humans do complex reasoning, they will:
+When humans do complex reasoning, they often:
 
 1. First try one direction
 2. Discover that it does not work
 3. **Backtrack** and try another direction
 4. **Compare back and forth** across multiple intermediate results
 
-LLMs cannot do these things. Autoregressive generation means: **once a token has been generated, it cannot be modified**.
+LLMs cannot do this. Autoregressive generation means: **once a token has been generated, it cannot be modified**.
 
 ```mermaid
 flowchart LR
@@ -232,7 +232,7 @@ flowchart LR
 
 ### Error Accumulation
 
-Worse still, errors in multi-step reasoning **accumulate**. If a small mistake appears in step 3, all later steps are built on top of that mistake.
+Worse, errors in multi-step reasoning **accumulate**. If a small mistake appears in step 3, every later step is built on top of that mistake.
 
 ```
 Problem: A class has 30 students, 60% of whom are girls. Among the girls, 75% participated in the sports meet.
@@ -256,13 +256,13 @@ Possible erroneous reasoning by an LLM:
 6. Percentage = 18 / 30 = 60% ✗ (wrong final answer)
 ```
 
-One wrong step, then every step goes wrong.
+One wrong step can make every later step wrong.
 
 ### The "Lost in the Middle" Problem
 
 Liu et al. (2023), in [_Lost in the Middle: How Language Models Use Long Contexts_](https://arxiv.org/abs/2307.03172), found a troubling phenomenon:
 
-When the input contains a large amount of information, **the model recalls information at the beginning and end best, while information in the middle is most easily ignored**.
+When the input contains a large amount of information, **the model recalls information at the beginning and end best, while information in the middle is the easiest to ignore**.
 
 ```mermaid
 graph LR
@@ -321,7 +321,7 @@ Based on the document above, answer: ...
 
 ### Frozen Knowledge
 
-An LLM's knowledge comes from its training data. The training data has a cutoff date. The model knows nothing about events that happened after that cutoff.
+An LLM's knowledge comes from its training data. That training data has a cutoff date. The model knows nothing about events that happened after the cutoff.
 
 ```
 Question: Who won the 2025 Super Bowl?
@@ -332,7 +332,7 @@ Question: What is the latest version of React?
 Answer: React 18.2 (a confident answer, but it may already be outdated)
 ```
 
-The second case is more dangerous: the model will not tell you that its information may be outdated. It will confidently give the newest information as of its training data cutoff, as if that were still "now".
+The second case is more dangerous: the model will not necessarily tell you that its information may be outdated. It will confidently give the newest information available at its training data cutoff, as if that were still "now".
 
 ### This Is Not a Bug; It Is Inevitable with Static Weights
 
@@ -347,16 +347,16 @@ flowchart LR
     style E2 fill:#ffcdd2
 ```
 
-The model's weights are fixed after training is complete. New information cannot be "injected" into existing weights (unless the model is retrained or fine-tuned).
+The model's weights are fixed after training is complete. New information cannot be "injected" into existing weights unless the model is retrained or fine-tuned.
 
 ### Solution
 
 | Approach | Applicable Scenario | Pros and Cons |
 |------|---------|--------|
-| RAG (Retrieval-Augmented Generation) | Needs real-time information | Flexible and updatable, but requires maintaining a retrieval system |
-| Web Search tool | Needs the latest information | Real-time, but depends on search quality |
-| Fine-tuning | New knowledge in a specific domain | Expensive, inflexible, knowledge may conflict |
-| Periodic retraining | Keeping overall knowledge up to date | Extremely expensive |
+| RAG (Retrieval-Augmented Generation) | Requires real-time information | Flexible and updatable, but requires maintaining a retrieval system |
+| Web Search tool | Requires the latest information | Real-time, but depends on search quality |
+| Fine-tuning | Adds new knowledge in a specific domain | Expensive, inflexible, and may create knowledge conflicts |
+| Periodic retraining | Keeps overall knowledge up to date | Extremely expensive |
 
 ```python
 # Basic RAG pattern
@@ -384,9 +384,9 @@ Question: {question}
 
 ### A Continuation Machine Must Continue
 
-Recall the core argument from Chapter 1: an LLM is a continuation machine. No matter what the input is, it generates the "most likely continuation".
+Recall the core argument from Chapter 1: an LLM is a continuation machine. Whatever the input is, it generates the "most likely continuation".
 
-This means: **the model never truly "refuses to answer"**. Even when it "does not know" the answer, the text it generates is simulating what "someone who knows the answer would say".
+This means: **the model never truly "refuses to answer"**. Even when it "does not know" the answer, the text it generates simulates what "someone who knows the answer would say".
 
 ```
 Question: What is the unified theory equation for quantum gravity?
@@ -405,9 +405,9 @@ When the model says "I don't know":
   ✓ It is predicting that, in this context, "I don't know" is the most likely continuation
 ```
 
-Models trained with RLHF say "I don't know" more often, but that does not mean they have become more "honest". It only means they have learned in which scenarios saying "I don't know" earns a higher reward.
+Models trained with RLHF say "I don't know" more often, but that does not mean they have become more "honest". It only means they have learned which scenarios reward the answer "I don't know".
 
-When the model answers confidently, you cannot tell from the answer itself whether it truly knows or is fabricating. (Chapter 7 will discuss this problem in detail.)
+When the model answers confidently, you cannot tell from the answer itself whether it truly knows or is fabricating. Chapter 7 will discuss this problem in detail.
 
 ### Practical Impact
 
@@ -442,7 +442,7 @@ Although modern models support very long contexts (Claude supports 200K tokens, 
 
 ### Long Context Does Not Equal Good Information Use
 
-"Needle in a Haystack" tests show that even when a model's context window is large enough, its ability to find specific information in long contexts declines as context length increases.
+"Needle in a Haystack" tests show that even when a model's context window is large enough, its ability to find specific information declines as context length increases.
 
 ```python
 # Basic idea of the "Needle in a Haystack" test
@@ -482,12 +482,12 @@ End (90-100%)     | 99%   | 97%   | 93%   | 85%
 
 ### You Cannot Stuff Everything into Context
 
-A common mistaken idea is: "The model supports 1M tokens, so I can just stuff all the documents into it!"
+A common misconception is: "The model supports 1M tokens, so I can just stuff all the documents into it!"
 
 The problems are:
 1. **Cost**: more tokens mean higher cost (billing is based on tokens)
 2. **Latency**: O(n^2) means that when context doubles, computation quadruples
-3. **Information retrieval degradation**: key information is more easily ignored in long contexts
+3. **Information retrieval degradation**: key information is easier to ignore in long contexts
 4. **Interference**: irrelevant information may affect the quality of the model's output
 
 ```mermaid
@@ -506,7 +506,7 @@ graph TD
 
 ## 6.7 Reliability Framework
 
-Putting together everything discussed above, we can build a **reliability framework** to help you judge whether a task should be handled by an LLM.
+Putting together everything discussed above, we can build a **reliability framework** to help judge whether a task should be handled by an LLM.
 
 ### Reliability Levels
 
@@ -547,7 +547,7 @@ graph TD
 |---------|--------|------|---------|
 | Translation | 🟢 High | Trained on massive parallel corpora | Use directly |
 | Summarization | 🟢 High | Compression is a training objective | Use directly |
-| Format conversion | 🟢 High | Large amount of format correspondence data | Use directly, with schema validation |
+| Format conversion | 🟢 High | Large amounts of format correspondence data | Use directly, with schema validation |
 | Information extraction | 🟢 High | The answer is in the input | Use directly, with structured output |
 | Code explanation | 🟢 High | Understanding > generation | Use directly |
 | Code generation | 🟡 Medium | May contain logic errors | Needs test verification |
@@ -609,7 +609,7 @@ None of the "hard limits" of LLMs are random bugs. They come from the model's fu
 | Faithfulness problem | A continuation machine must continue | Even without knowing the answer, it generates text that "looks right" |
 | Context limits | O(n^2) + information degradation | Longer does not mean better |
 
-After understanding these limitations, the right approach is not to "find ways to make LLMs overcome these limitations", but to **design systems that route around these limitations**:
+After understanding these limitations, the right approach is not to "find ways to make LLMs overcome these limitations", but to **design systems that route around them**:
 
 > **Let LLMs do what they are good at (pattern recognition, transformation, extraction), and let tools do what LLMs are bad at (calculation, retrieval, verification).**
 

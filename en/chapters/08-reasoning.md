@@ -6,17 +6,17 @@
 
 > "Asked to think step by step, the model writes down what 'thinking step by step' looks like — and gets the right answer more often. We don't fully understand why."
 
-LLMs can solve math problems. LLMs can write programs. LLMs can derive logic. When you watch a model break a complex problem into steps, write out a reasoning process, and finally give the correct answer, it is hard not to feel that "it is thinking."
+LLMs can solve math problems. LLMs can write programs. LLMs can derive logical conclusions. When you watch a model break a complex problem into steps, write out a reasoning process, and finally give the correct answer, it is hard not to feel that "it is thinking."
 
-But if you have talked with models for a while, you must have seen the other side too:
+But if you have talked with models for a while, you have probably seen the other side too:
 
-- It can solve college entrance exam math problems, but cannot count how many letters are in a word
-- It can write complex algorithm analysis, but get `9.11 vs 9.9 which is larger` wrong
-- It can give you 50 lines of rigorous argument, then somehow fail at the final step
+- It can solve college entrance exam math problems, but cannot count how many letters are in a word.
+- It can write complex algorithm analysis, but get `Which is larger, 9.11 or 9.9?` wrong.
+- It can give you 50 lines of rigorous argument, then somehow fail at the final step.
 
-**Is it really reasoning, or advanced imitation?** This chapter will not pretend to give a final answer. This is one of the most active open questions in current AI research. But we can break the problem apart and look at what different perspectives can and cannot explain.
+**Is it really reasoning, or advanced imitation?** This chapter does not pretend to give a final answer. This is one of the most active open questions in current AI research. But we can break the problem apart and look at what different perspectives can and cannot explain.
 
-More importantly: **once you understand the mechanism of reasoning (whether or not it is "real" reasoning), you know how to maximize its effect in engineering**.
+More importantly: **once you understand the mechanics of reasoning (whether or not it is "real" reasoning), you know how to maximize its effect in engineering**.
 
 ---
 
@@ -44,7 +44,7 @@ A: Let's think step by step.
 
 Just adding the sentence "Let's think step by step" raised accuracy on the GSM8K math benchmark from about 18% to about 50%.
 
-**This is an unusual finding**. You did not retrain the model, you did not give it new knowledge, you only changed one sentence in the prompt, and the ability "emerged."
+**This is an unusual finding**. You did not retrain the model, you did not give it new knowledge, you changed only one sentence in the prompt, and the ability "emerged."
 
 ### Why It Works: More Tokens = More Computation
 
@@ -66,11 +66,11 @@ flowchart LR
     style A2 fill:#c8e6c9
 ```
 
-Every generated token is a complete forward pass, and the model can use all previously generated content for computation. If it directly generates the answer, the model only has the context of the "question" to use. If it first generates a piece of reasoning, then when it generates the final answer, it can use **the intermediate results it just generated itself**.
+Every generated token is a complete forward pass, and the model can use all previously generated content for computation. If it generates the answer directly, the model only has the context of the "question" to use. If it first generates a piece of reasoning, then when it generates the final answer, it can use **the intermediate results it just generated itself**.
 
 Put another way: **CoT lets the model perform a linear search / sequential computation over the token sequence**. Computation that originally had to be crammed into one forward pass is spread across N forward passes.
 
-There is theoretical support for this. Feng et al. (2023), in [_Towards Revealing the Mystery behind Chain of Thought_](https://arxiv.org/abs/2305.15408), proved that for certain tasks whose computational complexity exceeds the expressive power of a single Transformer layer, CoT lets a Transformer theoretically express functions it otherwise could not express.
+There is theoretical support for this. Feng et al. (2023), in [_Towards Revealing the Mystery behind Chain of Thought_](https://arxiv.org/abs/2305.15408), proved that for certain tasks whose computational complexity exceeds the expressive power of a single Transformer layer, CoT lets a Transformer express functions it otherwise could not express.
 
 **Intuition**: a Transformer's "depth" is fixed (the number of layers). But with CoT, you can **trade token sequence length for depth**. Each new token is equivalent to an extra layer of "virtual depth."
 
@@ -80,7 +80,7 @@ CoT has significant costs:
 
 1. **Latency**: the number of tokens to generate goes from 1 to dozens or hundreds, significantly increasing TTFT (time to last token)
 2. **Cost**: billing is token-based, so cost increases linearly
-3. **It is not always effective**: on simple tasks, CoT can instead reduce accuracy (because the extra generated steps may themselves introduce errors)
+3. **It is not always effective**: on simple tasks, CoT can reduce accuracy instead (because the extra generated steps may themselves introduce errors)
 
 ```python
 # A simple decision for when to use CoT
@@ -129,7 +129,7 @@ A: Let's think step by step.
 
 The examples serve two purposes: **demonstrating the reasoning style** (what kind of phrasing to use for decomposition) + **implicitly defining the task** (telling the model this is a math problem, not something else).
 
-Applicable scenario: the task format is relatively "non-mainstream," and the model is unlikely to guess what kind of reasoning structure you want.
+Applicable scenario: the task format is relatively unusual, and the model is unlikely to infer what kind of reasoning structure you want.
 
 ### Self-Consistency: Sample Multiple Times and Vote
 
@@ -145,7 +145,7 @@ The cost is n times as many calls, but the accuracy improvement is usually signi
 
 ### Tree-of-Thoughts: Let the Model Explore Multiple Paths
 
-Yao et al. (2023), in [_Tree of Thoughts_](https://arxiv.org/abs/2305.10601), proposed: do not make the model walk one straight path. Let it **expand multiple reasoning branches**, then evaluate, prune, and backtrack.
+Yao et al. (2023), in [_Tree of Thoughts_](https://arxiv.org/abs/2305.10601), proposed: do not make the model follow one straight path. Let it **expand multiple reasoning branches**, then evaluate, prune, and backtrack.
 
 ```mermaid
 graph TD
@@ -171,7 +171,7 @@ The cost is enormous. It may require dozens of model calls.
 
 ### CoT + Tools: An Echo of Chapter 7
 
-The strongest combination: the model uses CoT to decompose the problem, and calls tools whenever a step needs a deterministic result.
+The strongest combination is for the model to use CoT to decompose the problem and call tools whenever a step needs a deterministic result.
 
 ```python
 # Reason → write code → execute → continue reasoning
@@ -195,7 +195,7 @@ Let's think step by step.
 # The answer is 76127.
 ```
 
-This is the most important design behind ChatGPT Code Interpreter / Claude Computer Use / Anthropic's Tool Use models.
+This is the core design pattern behind ChatGPT Code Interpreter / Claude Computer Use / Anthropic's Tool Use models.
 
 ---
 
@@ -203,7 +203,7 @@ This is the most important design behind ChatGPT Code Interpreter / Claude Compu
 
 Starting in 2024, a new class of models appeared in the AI industry: OpenAI's o1, DeepSeek's R1, Anthropic's Claude (with extended thinking), Google's Gemini Thinking, and others. They are collectively called **reasoning models**.
 
-Their core change: **CoT is no longer a prompt-time trick, but has been trained into the model's default behavior**.
+Their core change: **CoT is no longer a prompt-time trick; it has been trained into the model's default behavior**.
 
 ### Changes in the Training Process
 
@@ -223,9 +223,9 @@ flowchart LR
     style R4 fill:#c8e6c9
 ```
 
-Concretely, reasoning models have two key training differences:
+Concretely, reasoning models differ in two key ways during training:
 
-1. **The reinforcement learning reward signal is "is the answer correct"**, not "is the answer liked by humans." This lets the model learn to optimize for "arriving at the correct answer," rather than "writing something that looks pleasant to read."
+1. **The reinforcement learning reward signal is "is the answer correct"**, not "is the answer liked by humans." This lets the model learn to optimize for "arriving at the correct answer," rather than "writing something that is pleasant to read."
 
 2. **During training, the model is encouraged to generate long reasoning chains**, even if it makes mistakes, hesitates, or backtracks along the way. The model is allowed to be "wrong first, right later," instead of pretending to be confident from the first token.
 
@@ -255,10 +255,10 @@ Reasoning model:
 ```
 
 Notice several key characteristics:
-- The reasoning process can be very long (thousands to tens of thousands of tokens)
-- The model will **self-correct** ("let me recalculate")
-- The user sees a concise final answer, while the thinking process is hidden
-- Accuracy on difficult problems is significantly higher than with regular models
+- The reasoning process can be very long (thousands to tens of thousands of tokens).
+- The model can **self-correct** ("let me recalculate").
+- The user sees a concise final answer, while the thinking process is hidden.
+- Accuracy on difficult problems is significantly higher than with regular models.
 
 ### Test-time Compute: Trading Inference Time for Accuracy
 
@@ -275,7 +275,7 @@ xychart-beta
 
 > Note: illustrative chart. Actual data varies by task and model. The trend comes from OpenAI o1's public test results.
 
-No matter how many tokens traditional models reason for, they do not become more accurate. They only want to "quickly give an answer." Reasoning models, by contrast, turn reasoning time into accuracy: the longer they think, the more accurate they become.
+No matter how many tokens traditional models reason for, they do not reliably become more accurate. They tend to "quickly give an answer." Reasoning models, by contrast, turn reasoning time into accuracy: the longer they think, the more accurate they become.
 
 This is **a new dimension of scaling laws**. Chapter 3 discussed "training-time scaling" (more parameters, more data). This is "inference-time scaling": without retraining the model, you can improve capability **by giving it more thinking time**.
 
@@ -292,7 +292,7 @@ response = reasoning_llm.generate(
 )  # May take tens of seconds to minutes, but answer accuracy is significantly higher
 ```
 
-**A new engineering tradeoff**: you can choose "expensive but accurate" or "cheap but fast," selecting the thinking budget by scenario.
+**A new engineering tradeoff**: you can choose "expensive but accurate" or "cheap but fast," selecting the thinking budget for each scenario.
 
 ### Reasoning Models Are Not Omnipotent
 
@@ -307,7 +307,7 @@ Do not mythologize them either. Reasoning models have no clear advantage in the 
 | Creative writing | Usually worse (too analytical) |
 | Real-time conversation | Not suitable (latency is too high) |
 
-**Rule of thumb**: if an ordinary engineer would stop and write many steps on scratch paper when doing the task, a reasoning model will be useful. If it can be answered intuitively, a regular model is better.
+**Rule of thumb**: if an ordinary engineer would stop and write many steps on scratch paper while doing the task, a reasoning model will be useful. If the task can be answered intuitively, a regular model is better.
 
 ---
 
@@ -325,7 +325,7 @@ Representative arguments supporting this position:
 
 If you change the names of people and objects in a math problem, accuracy changes significantly. Mirzadeh et al. (2024), in [_GSM-Symbolic_](https://arxiv.org/abs/2410.05229), showed that simply replacing numbers or names can cause model performance on GSM8K to fluctuate by more than 10%.
 
-If the model were really "reasoning," meaning it understood the problem's logical structure, these surface-level replacements should not affect it. But in practice they have a large effect. This suggests the model depends heavily on **specific phrasing patterns seen in the training data**.
+If the model were really "reasoning," meaning it understood the problem's logical structure, these surface-level replacements should not affect it. But in practice, they have a large effect. This suggests the model depends heavily on **specific phrasing patterns seen in the training data**.
 
 **Argument 2: Long-tail problems collapse**
 
@@ -393,7 +393,7 @@ The engineering lesson: **do not get stuck on the philosophical question**. The 
 In _Thinking, Fast and Slow_, Daniel Kahneman divides human thinking into two kinds:
 
 - **System 1**: fast, automatic, intuitive, low energy
-- **System 2**: slow, deliberate, reasoning, high energy
+- **System 2**: slow, deliberate, analytical, high energy
 
 This distinction fits LLMs surprisingly well:
 
@@ -438,11 +438,11 @@ def choose_thinking_mode(task):
 
 Sprague et al. (2024), in [_To CoT or Not to CoT?_](https://arxiv.org/abs/2409.12183), systematically measured CoT's effect on different tasks. The conclusion is surprising:
 
-- On math and symbolic reasoning tasks, CoT improves performance by 15-20% on average
-- On commonsense Q&A, CoT has almost no effect
-- On some factual tasks, CoT **instead reduces accuracy**
+- On math and symbolic reasoning tasks, CoT improves performance by 15-20% on average.
+- On commonsense Q&A, CoT has almost no effect.
+- On some factual tasks, CoT **reduces accuracy instead**.
 
-Why? Because for tasks the model can already get right intuitively, forcing it to write a reasoning process introduces new opportunities for error. It may dig a hole for itself in the intermediate steps.
+Why? Because for tasks the model can already get right intuitively, forcing it to write a reasoning process introduces new opportunities for error. It may dig itself into a hole in the intermediate steps.
 
 > **Engineering principle**: CoT is not a free lunch. In production systems, you should **measure** whether it is effective on your specific task, rather than turning it on by default.
 
@@ -450,7 +450,7 @@ Why? Because for tasks the model can already get right intuitively, forcing it t
 
 ## 8.6 Engineering Practice for Reasoning
 
-Organize everything in this chapter into an engineering decision framework:
+We can organize everything in this chapter into an engineering decision framework:
 
 ### Decision Tree
 
@@ -496,13 +496,13 @@ Not every task needs CoT. On simple classification and intuitive judgment tasks,
 
 **Mistake 2: Using a reasoning model for real-time conversation**
 
-Reasoning model latency is usually from tens of seconds to minutes. Putting it into an interactive chatbot will drive users crazy.
+A reasoning model's latency is usually tens of seconds to minutes. Putting it into an interactive chatbot will frustrate users.
 
 **Mistake 3: Thinking "the more detailed the CoT, the better"**
 
 The longer the CoT, the larger the window for error accumulation. The best CoT is "just enough": neither too much nor too little. You can guide this through the prompt: "Please reason in concise steps."
 
-**Mistake 4: Ignoring how the "thinking process" contaminates the final answer**
+**Mistake 4: Ignoring how the "thinking process" can contaminate the final answer**
 
 After a model makes a mistake in CoT, the final answer is likely to be based on that mistake. Engineering systems should add **independent verification of the final answer**, such as recomputing with tools or having another model review it.
 
@@ -515,7 +515,7 @@ This chapter ends with an open question: **does LLM reasoning ability have a cei
 What we currently see:
 
 1. CoT lets Transformers break through "the original architecture's expressive power limit" on some tasks
-2. Reasoning models further and significantly improve accuracy on reasoning tasks through RL
+2. Reasoning models further improve accuracy on reasoning tasks through RL
 3. Test-time compute provides a new scaling dimension
 
 But at the same time:
@@ -528,7 +528,7 @@ One view (supported by Yann LeCun and others): current architectures fundamental
 
 Another view (supported by OpenAI, Anthropic, and others): through RL + longer thinking + tool use, current architectures can continue improving, with no obvious ceiling.
 
-Chapter 15 will return to this topic. Here I only want to emphasize: **this is a real open question. Do not believe anyone who claims the answer is already known**.
+Chapter 15 will return to this topic. Here, I only want to emphasize: **this is a real open question. Do not believe anyone who claims the answer is already known**.
 
 ---
 

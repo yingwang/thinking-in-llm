@@ -6,9 +6,9 @@
 
 > "The model is bullshitting. Not lying, not mistaken — bullshitting in the technical sense: producing language without regard for truth."
 
-At the end of Chapter 6, we pointed out the "faithfulness problem" of LLMs: the continuation engine will always continue. Even when it "doesn't know" the answer, it will generate a response that looks plausible. This chapter takes that problem apart.
+At the end of Chapter 6, we pointed out the "faithfulness problem" of LLMs: the continuation engine always continues. Even when it "doesn't know" the answer, it generates a response that looks plausible. This chapter takes that problem apart.
 
-Hallucination is an unavoidable topic in LLM applications. Every practitioner has tripped over it: a model confidently cites a paper that does not exist, fabricates an API that does not exist, or gets a person's birth and death dates wrong by thirty years. But **hallucination is not a bug**. It is the logical consequence of the training objective called next-token prediction.
+Hallucination is unavoidable in LLM applications. Every practitioner has tripped over it: a model confidently cites a nonexistent paper, fabricates a nonexistent API, or gets a person's birth and death dates wrong by thirty years. But **hallucination is not a bug**. It is the logical consequence of the training objective called next-token prediction.
 
 The core claims of this chapter:
 
@@ -17,7 +17,7 @@ The core claims of this chapter:
 3. To some extent, the model "knows that it does not know", but this signal is hidden by default
 4. Every effective way to reduce hallucination changes the **conditions** of continuation, not continuation itself
 
-After understanding this chapter, you will be able to explain clearly why RAG works, why "please cite sources" is a bad instruction, and why temperature=0 does not reduce hallucination.
+After reading this chapter, you will be able to explain clearly why RAG works, why "please cite sources" is a bad instruction, and why temperature=0 does not reduce hallucination.
 
 ---
 
@@ -25,7 +25,7 @@ After understanding this chapter, you will be able to explain clearly why RAG wo
 
 ### There Is No "I Don't Know" Item in the Training Objective
 
-Recall Chapter 1: the training objective of an LLM is to maximize P(next token | context). Notice that there is no "honesty" constraint here, no modeling of "knowledge boundaries", and no mechanism for "refusing to answer when uncertain".
+Recall Chapter 1: the training objective of an LLM is to maximize P(next token | context). There is no "honesty" constraint here, no modeling of "knowledge boundaries", and no mechanism for "refusing to answer when uncertain".
 
 The model is trained to do one thing: **given a context, output the most likely continuation**.
 
@@ -48,7 +48,7 @@ The model still computes: P(next token | "The winner of the 1873 Nobel Prize in 
 The model will not stop to question the premise. It will output a token that looks like "the name of a Nobel laureate".
 ```
 
-The essence of hallucination is here: **the model has no concept of "the premise is false"; it only has "which token has the highest probability in this context"**.
+This is the essence of hallucination: **the model has no concept of "the premise is false"; it only has "which token has the highest probability in this context"**.
 
 ### "Most Likely" Does Not Mean "True"
 
@@ -65,18 +65,18 @@ flowchart LR
     style True fill:#c8e6c9
 ```
 
-In most cases, statistical plausibility ≈ factual correctness, because most factual statements in the training data are true. But when the model encounters:
+In most cases, statistical plausibility ≈ factual correctness, because most factual statements in the training data are true. But when the model encounters any of the following:
 
 - Specific facts that never appeared in the training data
 - Information from multiple contradictory sources
 - Rare combinations ("a specific county magistrate in 19th-century China")
 - Queries that "look a lot like a real pattern" but are actually fictional
 
-Then its output slides from "statistically plausible and true" toward "statistically plausible but false". The model itself cannot sense this boundary.
+its output can slide from "statistically plausible and true" toward "statistically plausible but false". The model itself cannot sense this boundary.
 
 ### Temperature=0 Is Not an Antidote
 
-Many beginners think temperature=0 (greedy decoding) can eliminate hallucination because it "outputs the most certain answer". This is a misunderstanding.
+Many beginners think temperature=0 (greedy decoding) can eliminate hallucination because it "outputs the most certain answer". That is a misunderstanding.
 
 ```
 Temperature controls: how sampling is performed from the token probability distribution
@@ -85,7 +85,7 @@ Temperature = 0 means: always choose the token with the highest probability
 But: the token with the highest probability still comes from a distribution that may deviate from the facts.
 ```
 
-If the model assigns the token "Tolstoy" a probability of 30% for the nonexistent fact "winner of the 1873 Nobel Prize in Literature" (because Tolstoy statistically often appears in literary-award contexts), then temperature=0 will **output Tolstoy 100% of the time**. It fabricates more confidently than temperature=0.7.
+If the model assigns the token "Tolstoy" a probability of 30% for the nonexistent fact "winner of the 1873 Nobel Prize in Literature" (because Tolstoy statistically often appears in literary-award contexts), then temperature=0 will **output Tolstoy 100% of the time**. It fabricates more deterministically than temperature=0.7.
 
 > **Key insight**: Temperature controls the randomness of sampling; it does not control the truthfulness of the underlying distribution. Temperature=0 only makes hallucinations **deterministically reproducible**. It does not eliminate them.
 
@@ -93,11 +93,11 @@ If the model assigns the token "Tolstoy" a probability of 30% for the nonexisten
 
 ## 7.2 Three Types of Hallucination
 
-Different types of hallucination have different root causes and different countermeasures. Discussing them all together is useless.
+Different types of hallucination have different root causes and different countermeasures. Treating them as one problem is not useful.
 
 ### Type 1: Knowledge Hallucination
 
-The model gives an answer that looks plausible but is wrong for facts that are absent from the training data, or that it has only seen as fragmentary clues.
+The model gives an answer that looks plausible but is wrong because the relevant facts are absent from the training data, or because the model has only seen fragmentary clues.
 
 **Example**:
 ```
@@ -105,13 +105,13 @@ Question: Introduce Python's `os.path.fakefunction()` function.
 Answer: `os.path.fakefunction()` is used in Python to... (fabricating an API that looks like the style of os.path)
 ```
 
-**Root cause**: The model has never seen this function, but it has seen many patterns like `os.path.<something>(...)`. It is continuing a "description that looks like an os.path function".
+**Root cause**: The model has never seen this function, but it has seen many patterns like `os.path.<something>(...)`. It is continuing a "description that looks like an os.path function."
 
 **Diagnostic feature**: It usually involves concrete nouns: person names, API names, paper titles, numbers, dates.
 
 ### Type 2: Reasoning Hallucination
 
-The model takes one wrong step in multi-step reasoning, but the later steps continue from the wrong premise and finally reach a wrong conclusion, while **the whole reasoning chain looks fluent**.
+The model takes one wrong step in multi-step reasoning, then later steps continue from the wrong premise and eventually reach the wrong conclusion, while **the whole reasoning chain looks fluent**.
 
 **Example**:
 ```
@@ -123,13 +123,13 @@ Possible wrong reasoning by the model:
 Answer: A is 14 years old.
 ```
 
-**Root cause**: The "autoregression without backtracking" discussed in Chapter 6. When generating the second step, the model does not go back to check the first step.
+**Root cause**: The "autoregression without backtracking" discussed in Chapter 6. When it generates the second step, the model does not go back to check the first step.
 
 **Diagnostic feature**: Each step looks "locally correct", but together they contradict the facts.
 
 ### Type 3: Instruction Hallucination
 
-The model claims to have completed an action, but in reality it did not do it at all. This is especially common in agent scenarios.
+The model claims to have completed an action, but in reality it did not perform the action at all. This is especially common in agent scenarios.
 
 **Example**:
 ```
@@ -145,7 +145,7 @@ You (system): "Let me read /etc/config.yaml ..."
 Fact: The model did not actually read the file; it is generating "what someone would say after pretending to read the file".
 ```
 
-**Root cause**: In poorly designed agent scenarios, the model confuses "calling a tool" with "generating descriptive text about calling a tool". After it generates the text "I will search", it does not actually call a tool, but the next generated paragraph continues with "the search result is...".
+**Root cause**: In poorly designed agent scenarios, the model confuses "calling a tool" with "generating descriptive text about calling a tool." After it generates the text "I will search", it does not actually call a tool; the next generated paragraph simply continues with "the search result is...".
 
 **Diagnostic feature**: The model describes a concrete action, but when you check the logs or tool-call records, you cannot find the corresponding execution trace.
 
@@ -157,17 +157,17 @@ Fact: The model did not actually read the file; it is generating "what someone w
 | Reasoning hallucination | Autoregression without backtracking + error accumulation | Multi-step math/logic problems | CoT, self-verification, external tools |
 | Instruction hallucination | Continuing text that "pretends it was done" | Agents / tool use | Enforced tool-call schema, checking execution traces |
 
-The next three sections handle them separately.
+The next three sections treat them separately.
 
 ---
 
 ## 7.3 Knowledge Hallucination and RAG
 
-Knowledge hallucination is the most common type. Its root cause is that the knowledge needed **does not exist, or exists only incompletely**, in the model weights.
+Knowledge hallucination is the most common type. Its root cause is that the required knowledge **does not exist, or exists only incompletely**, in the model weights.
 
 ### Why "Please Cite Sources" Is a Bad Instruction
 
-A common "anti-hallucination prompt" used by beginners:
+A common "anti-hallucination prompt" from beginners:
 
 ```
 Please answer the following question and cite sources.
@@ -178,13 +178,13 @@ Model output: China's GDP in 2023 was 17.7 trillion USD.
               (http://www.stats.gov.cn/sj/zxfb/202402/t20240228_1947915.html)
 ```
 
-This looks credible. The problem is: **this URL is also continued by the model**. The model never "opened" that web page; it is only continuing "a string that looks like a National Bureau of Statistics communiqué URL".
+This looks credible. The problem is that **this URL is also continued by the model**. The model never "opened" that web page; it is only continuing "a string that looks like a National Bureau of Statistics communiqué URL."
 
-> **Key insight**: You cannot make the model "cite real sources", because it has no ability to access real sources. It can only continue text that "looks like a source". To make citations real, the model must first **see the real sources**.
+> **Key insight**: You cannot make the model "cite real sources", because it has no ability to access real sources. It can only continue text that "looks like a source." To make citations real, the model must first **see the real sources**.
 
 ### The Essence of RAG: Changing the Conditions of Continuation
 
-The core of RAG (Retrieval-Augmented Generation) is not "letting the model look things up". It is **changing the conditional probability distribution from which the model continues**.
+The core of RAG (Retrieval-Augmented Generation) is not "letting the model look things up." It is **changing the conditional probability distribution from which the model continues**.
 
 ```mermaid
 flowchart LR
@@ -207,7 +207,7 @@ flowchart LR
     style A2 fill:#c8e6c9
 ```
 
-Returning to the perspective of Chapter 1: the probability of a continuation is P(answer | context). What RAG does is **expand the context** by putting real documents into it:
+Returning to the perspective of Chapter 1: the probability of a continuation is P(answer | context). RAG **expands the context** by putting real documents into it:
 
 ```python
 # Without RAG
@@ -230,11 +230,11 @@ What was China's GDP in 2023?
 # The model only needs to "copy" the answer from the materials, not "recall" it from weights
 ```
 
-**RAG works not because it gives the model more "knowledge", but because it turns a "memory question" into a "reading comprehension question"**. The model is already good at the latter.
+**RAG works not because it gives the model more "knowledge", but because it turns a "memory question" into a "reading-comprehension question"**. The model is already good at the latter.
 
 ### Teaching the Model to Say "I Don't Know"
 
-Even with RAG, you will encounter cases where "the materials do not contain the answer". In that case, you want the model to say "no relevant information was found in the materials" instead of forcibly fabricating something from its weights.
+Even with RAG, you will encounter cases where "the materials do not contain the answer." In that case, you want the model to say "no relevant information was found in the materials" instead of forcing an answer from its weights.
 
 ```python
 # Bad prompt
@@ -260,12 +260,12 @@ Please answer in the following format:
 ```
 
 Notice two details:
-1. **Explicit instruction**: "If it is absent, say it is absent" gives the "I don't know" token an entry point for being selected
+1. **Explicit instruction**: "If it is absent, say it is absent" gives the "I don't know" token a path to selection
 2. **Structured output**: Make "I don't know" one of the legal output formats
 
 ### Engineering Implementation of Citations
 
-If you want the model to provide verifiable citations, the correct approach is:
+If you want the model to provide verifiable citations, use this approach:
 
 ```python
 # Give each document snippet an ID
@@ -294,13 +294,13 @@ def verify_citations(response, valid_ids):
     return True, "OK"
 ```
 
-With this "ID whitelist + post-hoc validation", you turn "the model freely generating URLs" into "the model can only choose from given IDs", completely blocking the path for fabricated citations.
+With this "ID whitelist + post-hoc validation", you turn "the model freely generating URLs" into "the model can only choose from given IDs", which blocks the path to fabricated citations.
 
 ---
 
 ## 7.4 Reasoning Hallucination and Self-Verification
 
-The root cause of reasoning hallucination is not "missing knowledge", but **error accumulation during generation**. The corresponding antidotes are also different.
+The root cause of reasoning hallucination is not "missing knowledge", but **error accumulation during generation**. Its antidotes are different as well.
 
 ### Reasoning That Looks Right
 
@@ -314,15 +314,15 @@ Possible wrong reasoning by the model:
 Answer: 132 handshakes.
 ```
 
-The correct answer is 66 (C(12,2) = 66; the reasoning above double-counts, because each handshake is counted once by each of the two people).
+The correct answer is 66 (C(12,2) = 66; the reasoning above double-counts because each handshake is counted once by each of the two people).
 
-But notice: the reasoning above **reads very smoothly**. If you do not stop and reflect, "Wait, each handshake should only be counted once", you may feel that it is right.
+But notice that the reasoning above **reads very smoothly**. If you do not stop and think, "Wait, each handshake should only be counted once", it may feel correct.
 
-This is exactly the danger of reasoning hallucination: **it carries a kind of "narrative plausibility"**. The model is good at making each step locally fluent, but it has no global validation mechanism.
+This is the danger of reasoning hallucination: **it carries a kind of "narrative plausibility"**. The model is good at making each step locally fluent, but it has no global validation mechanism.
 
 ### Self-Consistency: Multiple Sampling and Voting
 
-A simple but effective countermeasure: let the model sample multiple times for the same question, then take the majority answer.
+A simple but effective countermeasure is to let the model sample multiple times for the same question, then take the majority answer.
 
 ```python
 def self_consistent_answer(question, n=10):
@@ -337,7 +337,7 @@ def self_consistent_answer(question, n=10):
     return Counter(answers).most_common(1)[0][0]
 ```
 
-The intuition of this method: **there is usually only one correct answer, but many wrong answers**. If repeated samples of the same reasoning process converge to the same answer, that answer is much more likely to be correct. Wang et al. (2022), in [_Self-Consistency Improves Chain of Thought Reasoning_](https://arxiv.org/abs/2203.11171), showed significant improvements on multiple math benchmarks.
+The intuition behind this method is that **there is usually only one correct answer, but many wrong answers**. If repeated samples of the same reasoning process converge to the same answer, that answer is much more likely to be correct. Wang et al. (2022), in [_Self-Consistency Improves Chain of Thought Reasoning_](https://arxiv.org/abs/2203.11171), showed significant improvements on multiple math benchmarks.
 
 Cost: n reasoning runs, n times the cost.
 
@@ -354,7 +354,7 @@ Please check step by step whether each step of the answer above is correct. If y
 
 But be careful: **the model's ability to check itself is limited**. Mirchandani et al. (2023), in [_Large Language Models Cannot Self-Correct Reasoning Yet_](https://arxiv.org/abs/2310.01798), found that asking a model to "check again" can sometimes change a correct answer into an incorrect one.
 
-A more effective approach is: **let another model (or the same model under a different prompt) play the reviewer**, because review tasks are friendlier to the model than generation tasks.
+A more effective approach is to **let another model (or the same model under a different prompt) play the reviewer**, because review tasks are friendlier to the model than generation tasks.
 
 ```python
 # Generator
@@ -377,9 +377,9 @@ critique = llm.generate(critique_prompt)
 
 ### Using Tools to Cut the Reasoning Chain
 
-The most reliable countermeasure is still the principle from Chapter 6: **let the LLM do what it is good at, and let tools do what they are not good at**.
+The most reliable countermeasure is still the principle from Chapter 6: **let the LLM do what it is good at, and let tools do what the LLM is not good at**.
 
-For the handshake problem above, the correct approach is not to make the model "calculate more carefully", but to make the model translate the problem into code:
+For the handshake problem above, the right approach is not to make the model "calculate more carefully", but to have it translate the problem into code:
 
 ```python
 prompt = f"""
@@ -394,13 +394,13 @@ Question: {question}
 # Then execute the code with a code interpreter
 ```
 
-This cuts the reasoning chain into two segments: the model is responsible for "understanding the problem → writing the formula", and the code is responsible for "calculating the value". The window for error accumulation is greatly shortened.
+This cuts the reasoning chain into two segments: the model is responsible for "understanding the problem → writing the formula", and the code is responsible for "calculating the value." The window for error accumulation is greatly shortened.
 
 ---
 
 ## 7.5 Instruction Hallucination and Execution Verification
 
-Instruction hallucination only appears in **agent scenarios**, but once it appears, it is extremely damaging, because the entire user's trust is built on "if the model says it did it, then it did it".
+Instruction hallucination appears only in **agent scenarios**, but once it appears, it is extremely damaging, because the user's trust rests on "if the model says it did it, then it did it."
 
 ### A Classic Failure Scene
 
@@ -416,13 +416,13 @@ I have checked your email for you. Yesterday you received 3 unread emails:
 You should prioritize Carol's email.
 ```
 
-The model has no email access at all, but its output **looks exactly like it did**. If the user does not verify it, they may simply believe it.
+The model has no email access at all, but its output **looks exactly as if it did**. If the user does not verify it, they may simply believe it.
 
-An even worse case: the model has a read_email tool, but it skips the call and directly continues with the "call result".
+An even worse case is when the model has a read_email tool, but skips the call and directly continues with the "call result."
 
 ### Root Cause: Continuing "What Someone Would Say After Doing It"
 
-After the model generates the token sequence "I have checked your email for you", the most natural continuation is "the result is...". It has no "wait, I need to actually call the tool" step, unless the system forces it to do so.
+After the model generates the token sequence "I have checked your email for you", the most natural continuation is "the result is..." It has no "wait, I need to actually call the tool" step unless the system forces it to do so.
 
 ```mermaid
 flowchart TD
@@ -437,7 +437,7 @@ flowchart TD
 
 ### Countermeasure: Tool Calls Must Be Structured Output
 
-In a correct agent design, "calling a tool" is not textual narration, but a **structured token sequence** (function calling, JSON schema, XML tags). The system intercepts this token sequence, executes it, and feeds the result back in.
+In a correct agent design, "calling a tool" is not textual narration; it is a **structured token sequence** (function calling, JSON schema, XML tags). The system intercepts this token sequence, executes it, and feeds the result back in.
 
 ```python
 # Wrong design: relying on a text convention
@@ -466,7 +466,7 @@ Chapter 11 will discuss agent design in detail. Here you only need to remember: 
 
 ### Making "I Couldn't Do It" a Legal Output
 
-Even with a tool-call mechanism, the model may still fabricate results when a tool is unavailable. Countermeasure: make "I cannot complete this" an explicit output option.
+Even with a tool-call mechanism, the model may still fabricate results when a tool is unavailable. The countermeasure is to make "I cannot complete this" an explicit output option.
 
 ```python
 prompt = """
@@ -477,7 +477,7 @@ Do not fabricate execution results.
 """
 ```
 
-Only when "cannot complete" becomes a legal output permitted by the training objective will the model choose it.
+Only when "cannot complete" becomes a legal output under the training objective will the model choose it.
 
 ---
 
@@ -485,7 +485,7 @@ Only when "cannot complete" becomes a legal output permitted by the training obj
 
 ### Partly, Through Logprob
 
-When an LLM generates each token, it internally has a complete probability distribution. To some extent, this distribution reflects the model's "confidence":
+When an LLM generates each token, it internally has a complete probability distribution. To some extent, that distribution reflects the model's "confidence":
 
 ```python
 # Both OpenAI / Anthropic APIs support returning logprob
@@ -516,13 +516,13 @@ def detect_hallucination(question, response):
     return "relatively credible"
 ```
 
-Research shows this signal is effective (Kadavath et al., 2022, [_Language Models (Mostly) Know What They Know_](https://arxiv.org/abs/2207.05221)): the model's average logprob on wrong answers is indeed lower than on correct answers.
+Research shows that this signal is effective (Kadavath et al., 2022, [_Language Models (Mostly) Know What They Know_](https://arxiv.org/abs/2207.05221)): the model's average logprob on wrong answers is indeed lower than on correct answers.
 
-**But there is a trap**: after RLHF, this calibration is damaged. RLHF tends to make models appear "very confident" in all answers, because hesitant answers receive lower reward. Therefore, base models have much better logprob calibration than chat models.
+**But there is a trap**: after RLHF, this calibration is damaged. RLHF tends to make models appear "very confident" in all answers, because hesitant answers receive lower reward. As a result, base models tend to have much better logprob calibration than chat models.
 
 ### Calibration Curve
 
-Ideally, when a model says "I am 90% confident", it should really be right in 90% of cases. This is called **calibration**.
+Ideally, when a model says "I am 90% confident", it should be right in 90% of cases. This is called **calibration**.
 
 ```mermaid
 xychart-beta
@@ -533,11 +533,11 @@ xychart-beta
     line "Model after RLHF" [40, 55, 65, 75, 85, 90]
 ```
 
-Models after RLHF are often "overconfident": when they say 50%, they may actually have 65% accuracy, which looks like an improvement; but when they say 99%, they may still only have 90% accuracy, making them insufficiently conservative for critical decisions.
+Models after RLHF are often "overconfident": when they say 50%, they may actually have 65% accuracy, which looks like an improvement; but when they say 99%, they may still have only 90% accuracy, making them insufficiently conservative for critical decisions.
 
 ### Letting the Model Express Uncertainty
 
-If you directly ask "How confident are you in this answer?", the model's response is still continued text. It has no metacognitive ability, but it has learned "how one should say how confident one is".
+If you directly ask "How confident are you in this answer?", the model's response is still continued text. It has no metacognitive ability, but it has learned "how one should say how confident one is."
 
 ```python
 # Engineering compromise
@@ -552,13 +552,13 @@ Reason: [why this confidence level]
 """
 ```
 
-Although this "confidence" is continued by the model rather than true introspection, in practice it has some correlation with accuracy, especially when the model has been explicitly trained to express uncertainty (for example, Claude has been trained in this respect).
+Although this "confidence" is continued by the model rather than produced by true introspection, in practice it has some correlation with accuracy, especially when the model has been explicitly trained to express uncertainty (for example, Claude has been trained in this respect).
 
 ---
 
 ## 7.7 Engineering Arsenal for Reducing Hallucination
 
-Summarizing all the countermeasures discussed above into a toolbox:
+We can summarize the countermeasures discussed above as a toolbox:
 
 | Weapon | Target hallucination type | Cost | Effect |
 |------|-------------|------|------|
@@ -608,17 +608,17 @@ flowchart TD
     style V fill:#f8bbd0
 ```
 
-Notice: **no single weapon can eliminate hallucination**. Production systems are always combinations of multiple layers of defense, not reliance on some "magic prompt".
+Notice: **no single weapon can eliminate hallucination**. Production systems always combine multiple layers of defense instead of relying on a "magic prompt."
 
 ---
 
 ## 7.8 A Counterintuitive Conclusion: Hallucination Cannot Be Rooted Out
 
-Summarize the whole chapter in one sentence:
+The whole chapter can be summarized in one sentence:
 
 > **Hallucination is not a "defect" of LLMs, but the "price" of what lets them do useful work**.
 
-The reason LLMs can give useful answers to questions they have never seen (creativity, generalization) is precisely that they continue content that is "statistically plausible". The other side of this ability is that they will continue content that is "statistically plausible but factually wrong". An LLM that **never hallucinates** is essentially equivalent to a lookup table that **can only repeat training data**.
+LLMs can give useful answers to questions they have never seen (creativity, generalization) precisely because they continue content that is "statistically plausible." The other side of this ability is that they will also continue content that is "statistically plausible but factually wrong." An LLM that **never hallucinates** is essentially equivalent to a lookup table that **can only repeat training data**.
 
 So the correct engineering goal is not to "eliminate hallucination", but to:
 
@@ -626,7 +626,7 @@ So the correct engineering goal is not to "eliminate hallucination", but to:
 2. **Limit the scenarios where it occurs** (which tasks go to the LLM, which go to deterministic systems)
 3. **Detect it and provide fallbacks** (validation layer + user warning that "AI may make mistakes")
 
-Once you understand this, you can avoid wasting time in the wrong direction, such as trying to make the model "absolutely never hallucinate" through increasingly complicated prompts. That path is dead.
+Once you understand this, you can avoid wasting time in the wrong direction, such as trying to make the model "absolutely never hallucinate" through increasingly complicated prompts. That path is a dead end.
 
 ---
 
@@ -643,7 +643,7 @@ Once you understand this, you can avoid wasting time in the wrong direction, suc
 | Does the model know that it doesn't know? | Partly (through logprob signals), but RLHF damages calibration |
 | Can hallucination be completely rooted out? | No. It is the price of an LLM's ability to generalize |
 
-In the next chapter, we discuss a deeper question: when a model performs "chain reasoning", is it truly reasoning, or merely imitating "the appearance of reasoning"?
+In the next chapter, we discuss a deeper question: when a model performs "chain reasoning", is it truly reasoning, or merely imitating "the appearance of reasoning?"
 
 ---
 

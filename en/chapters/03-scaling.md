@@ -7,11 +7,11 @@
 > "The unreasonable effectiveness of scale."
 > — An AI adaptation of Wigner's famous phrase
 
-Over the past five years, the most profound discovery in AI has not been a new algorithm, but a simple fact: **make the model bigger, add more data, add more compute, and performance improves, in a predictable way**.
+Over the past five years, the most profound discovery in AI has not been a new algorithm, but a simple fact: **make models larger, train on more data, use more compute, and performance improves in a predictable way**.
 
-This was not an obvious conclusion. For most of machine learning history, "making things bigger" meant overfitting and waste. But the combination of Transformer + big data broke this pattern and gave rise to a new paradigm: **scale is all you need**.
+This was not an obvious conclusion. For most of machine learning history, "making things bigger" meant overfitting and waste. But the combination of Transformers and big data broke this pattern and gave rise to a new paradigm: **scale is all you need**.
 
-In this chapter, we will understand why scale works, when scale fails, and how scale gives rise to abilities we did not anticipate.
+In this chapter, we will examine why scale works, when scale fails, and how it gives rise to abilities we did not anticipate.
 
 ---
 
@@ -31,7 +31,7 @@ where $\alpha_N \approx 0.076$, $\alpha_D \approx 0.095$, and $\alpha_C \approx 
 
 ### Log-Log Plots: One Straight Line Changed Everything
 
-When you plot loss vs. parameter count/data size/compute on log-log axes, you see an almost perfect **straight line**:
+When you plot loss against parameter count, data size, or compute on log-log axes, you see an almost perfect **straight line**:
 
 ```
 log(Loss)
@@ -50,7 +50,7 @@ log(Loss)
 This means:
 
 1. **Predictability**: you can predict the performance of larger models in advance, without training them first
-2. **Clear return on investment**: 10x compute → a fixed proportional drop in loss
+2. **Clear return on investment**: 10x more compute → a fixed proportional drop in loss
 3. **No obvious bend in the curve**: at the scales studied at the time, the power-law relationship had not flattened out
 
 This is why technology companies were willing to invest tens of billions of dollars in training larger models: **the returns were predictable**.
@@ -86,7 +86,7 @@ for params in [1, 7, 70, 405]:
 
 ### A Unified View of Compute
 
-Kaplan also found that if you look only at total compute C (≈ 6ND, where N is parameter count and D is the number of training tokens), loss behaves in the "cleanest" way. This means that, under a fixed compute budget, how to allocate parameters and data is an **optimization problem**.
+Kaplan also found that if you look only at total compute C (≈ 6ND, where N is parameter count and D is the number of training tokens), loss follows the "cleanest" pattern. This means that, under a fixed compute budget, allocating parameters and data is an **optimization problem**.
 
 ---
 
@@ -112,9 +112,9 @@ Model parameter count    Optimal number of training tokens
 
 ### GPT-3 Was Undertrained
 
-According to the Chinchilla law, GPT-3 (175B parameters) should have been trained on about 3.5T tokens, but in reality it used only 300B tokens: it was **severely undertrained**. With the same compute budget, a smaller but better-performing model could have been trained by following the Chinchilla-optimal allocation.
+According to the Chinchilla law, GPT-3 (175B parameters) should have been trained on about 3.5T tokens, but in practice it used only 300B tokens: it was **severely undertrained**. With the same compute budget, a smaller but better-performing model could have been trained by following the Chinchilla-optimal allocation.
 
-DeepMind trained a 70B-parameter Chinchilla model using the same amount of compute as GPT-3, and it outperformed GPT-3 on almost all benchmarks.
+DeepMind trained a 70B-parameter Chinchilla model using the same compute budget as GPT-3, and it outperformed GPT-3 on almost all benchmarks.
 
 ```mermaid
 graph LR
@@ -132,7 +132,7 @@ graph LR
 
 ### Over-Training
 
-But the story in practice is more complex. The Chinchilla law optimizes **training efficiency**: reaching the lowest loss with the least compute. But the real world also has to consider **inference efficiency**.
+In practice, however, the story is more complex. The Chinchilla law optimizes **training efficiency**: reaching the lowest loss with the least compute. Real-world deployment also has to consider **inference efficiency**.
 
 The inference cost of a 70B model is far higher than that of a 7B model. If your application needs high-throughput inference, an "over-trained" smaller model (trained on far more data than the Chinchilla optimum) may have a lower overall cost.
 
@@ -147,11 +147,11 @@ LLaMA-65B:  trained on 1.4T tokens (Chinchilla optimum ≈ 1.3T)
 → Lower total TCO in inference-intensive scenarios
 ```
 
-**Inference-optimal scaling**: if inference happens far more often than training (almost all commercial scenarios), then training a smaller model on more data is economically more sensible.
+**Inference-optimal scaling**: if inference happens far more often than training, as it does in almost all commercial scenarios, then training a smaller model on more data is economically more sensible.
 
 ### The Data Wall
 
-The Chinchilla law also implies a challenge: the larger the model, the more high-quality training data it needs. But high-quality text on the internet is limited:
+The Chinchilla law also implies a challenge: the larger the model, the more high-quality training data it needs. But high-quality text on the internet is finite:
 
 ```
 Estimated total high-quality internet text: ~10-15T tokens
@@ -161,7 +161,7 @@ GPT-4 training data (estimated):     ~13T tokens
 LLaMA-3 405B:                         15T tokens
 ```
 
-We may be approaching the "data wall": naturally produced high-quality text may not be enough to train the next generation of models. Synthetic data (letting models produce training data) and multimodal data (images, video, audio) are the main responses today.
+We may be approaching the "data wall": naturally produced high-quality text may not be enough to train the next generation of models. Synthetic data (letting models produce training data) and multimodal data (images, video, audio) are the main approaches today.
 
 ---
 
@@ -169,7 +169,7 @@ We may be approaching the "data wall": naturally produced high-quality text may 
 
 ### What Is Emergence?
 
-Scaling laws tell us that loss decreases smoothly. But some researchers found that the appearance of certain **specific abilities** is not smooth: they seem to "jump" into existence at some scale.
+Scaling laws tell us that loss decreases smoothly. But some researchers found that the appearance of certain **specific abilities** is not smooth: they seem to "jump" into existence at a certain scale.
 
 [Wei et al. 2022](https://arxiv.org/abs/2206.07682) defined **emergent abilities**:
 
@@ -238,10 +238,10 @@ graph LR
 
 ### Either Way, Large Models Changed Qualitatively
 
-Whether or not emergence is a statistical illusion, one fact is hard to deny: **there are tasks that small models cannot do but large models can**. Whether the underlying mechanism is smooth growth or a phase transition, from the user's perspective the effect is "from impossible to possible".
+Whether or not emergence is a statistical artifact, one fact is hard to deny: **there are tasks that small models cannot do but large models can**. Whether the underlying mechanism is smooth growth or a phase transition, from the user's perspective the effect is "from impossible to possible".
 
 Practical implications:
-- **Consider task complexity when choosing model size**: simple tasks do not need large models; complex reasoning tasks do
+- **Consider task complexity when choosing model size**: simple tasks do not need large models; complex reasoning tasks do need them
 - **Do not evaluate complex abilities on small models and extrapolate**: a zero score from a small model does not mean a large model will also score zero
 - **Prompting techniques (such as CoT) work only on sufficiently large models**
 
@@ -282,7 +282,7 @@ Observed:
 - Epoch 30000: training accuracy 100%, test accuracy 98% (suddenly learned!)
 ```
 
-The model first **memorizes** the training set, then after a long period of continued training, it suddenly **generalizes**.
+The model first **memorizes** the training set; then, after a long period of continued training, it suddenly **generalizes**.
 
 ### Why Does Grokking Happen?
 
@@ -307,7 +307,7 @@ The discovery of grokking challenges the traditional wisdom of "early stopping":
 
 1. **Training loss of 0 does not mean training should stop**: generalization may not have happened yet
 2. **Regularization matters**: weight decay is the key force that pushes the model from memorization to generalization
-3. **The model may already be close to "understanding" but not yet fully grokked**: sometimes more training is enough to break through
+3. **The model may already be close to "understanding" but may not have fully grokked the rule yet**: sometimes more training is enough to break through
 4. **Phase transitions are real**: learning is not always smooth; qualitative change points exist
 
 However, caution is needed: grokking has so far mainly been observed on small-scale algorithmic tasks. Whether it also occurs in the training of large language models remains an open question.
@@ -318,11 +318,11 @@ However, caution is needed: grokking has so far mainly been observed on small-sc
 
 ### The Lesson of the Hutter Prize
 
-Marcus Hutter (a driving force behind Solomonoff induction and AIXI theory) established the [Hutter Prize](http://prize.hutter1.net/): a prize for algorithms that can **compress** Wikipedia better.
+Marcus Hutter (a driving force behind Solomonoff induction and AIXI theory) established the [Hutter Prize](http://prize.hutter1.net/): a prize for algorithms that can **compress** Wikipedia more effectively.
 
 The philosophy behind it is: **compression and intelligence are two sides of the same thing**.
 
-To compress data, you need to find patterns in the data: that is understanding. A perfect compressor is a perfect predictor (because compression = eliminating redundancy = predicting the next bit/token).
+To compress data, you need to find patterns in the data; that is understanding. A perfect compressor is a perfect predictor, because compression means eliminating redundancy, which means predicting the next bit or token.
 
 The cross-entropy loss used to train language models measures compression efficiency:
 
@@ -356,7 +356,7 @@ From loss 2.5 → 2.0: requires 100x compute
 From loss 2.0 → 1.5: requires 1000x compute
 ```
 
-Progress continues, but it becomes more and more expensive.
+Progress continues, but it becomes increasingly expensive.
 
 **2. Some abilities may not be contained in text compression**
 
@@ -365,7 +365,7 @@ Progress continues, but it becomes more and more expensive.
 - Long-term planning (requires search, not just intuition)
 - Formal mathematical proof (requires verification, not just generation)
 
-These abilities may require architectural innovation or changes in training paradigm, not just more scale.
+These abilities may require architectural innovation or changes in the training paradigm, not just more scale.
 
 **3. Data quality matters more than data quantity**
 

@@ -4,20 +4,20 @@
 
 # Chapter 11: First Principles of Agents
 
-> "An agent is just a while loop with a tool call." - This is most of the truth in practice, but also only half of it.
+> "An agent is just a while loop with a tool call." - In practice, this is mostly true, but it is also only half the story.
 
-"Agent" has been the most overused word of the past two years. From AutoGPT to LangChain agents, then to OpenAI's GPTs and Anthropic's Computer Use, every project calls itself an agent, but their definitions all differ.
+"Agent" has been the most overused word of the past two years. From AutoGPT to LangChain agents, and then to OpenAI's GPTs and Anthropic's Computer Use, every project calls itself an agent, but the definitions all differ.
 
-This chapter does not argue over terminology. We will do something more useful: starting from the perspectives established in Chapters 9 and 10 - "prompting is programming" and "knowledge injection" - we will **derive** what an agent is, when it is needed, and how to design one without letting it go off the rails.
+This chapter will not argue over terminology. We will do something more useful: starting from the perspectives established in Chapters 9 and 10 - "prompting is programming" and "knowledge injection" - we will **derive** what an agent is, when it is needed, and how to design one without letting it go off the rails.
 
 Core claims:
 
 1. **The essence of an agent is extending the LLM's token space into the real world**
-2. **The fundamental difficulty of agents is that autoregressive models lack "lookahead planning" ability**
+2. **The fundamental difficulty of agents is that autoregressive models lack the ability to perform "lookahead planning"**
 3. **Most systems advertised as "agents" are actually solvable with a single prompt**
 4. **The best agent designs are often the simplest**
 
-After reading this chapter, you will have a clear criterion for "when to use an agent, and when not to", and you will know the most common root causes of failure in production agent systems.
+After reading this chapter, you will have a clear criterion for "when to use an agent, and when not to" and will know the most common root causes of failure in production agent systems.
 
 ---
 
@@ -49,9 +49,9 @@ This is the "skeleton" of an agent. **All agent frameworks - LangChain, AutoGPT,
 
 ### First-Principles View: Tool Use Extends Token Space
 
-Recall Chapter 1: what an LLM does is "continue text in token space".
+Recall Chapter 1: an LLM "continues text in token space".
 
-The token space of an ordinary LLM is closed - it only contains things seen in the training data. But when you give an LLM tools:
+The token space of an ordinary LLM is closed: it only contains things seen in the training data. But when you give an LLM tools:
 
 ```mermaid
 flowchart LR
@@ -76,14 +76,14 @@ flowchart LR
 
 **Tool use is not "letting AI use tools" - it is turning the real world into tokens that the LLM can read and write**.
 
-- Call a database query → the JSON returned by the database enters the token sequence
+- Run a database query → the JSON returned by the database enters the token sequence
 - Browse a web page → DOM text enters the token sequence
 - Execute a piece of code → stdout enters the token sequence
 - Send an email → "email sent" enters the token sequence
 
-The LLM is still only continuing text in token space. But that token space has been extended by tools far beyond the scope of the training data.
+The LLM is still only continuing text in token space. But tools have extended that token space far beyond the scope of the training data.
 
-Understanding this lets you explain many design choices:
+Understanding this explains many design choices:
 
 - Why tool output format matters → it must become tokens the LLM can "understand"
 - Why browser automation is hard → web page DOM is a huge, noisy token stream
@@ -110,12 +110,12 @@ Action: finish("Final answer")
 
 Each loop step contains:
 - **Thought**: the model reasons out loud (an echo of CoT in agent scenarios)
-- **Action**: call a tool
+- **Action**: the model calls a tool
 - **Observation**: the result returned by the tool
 
 ReAct's key insight: **making the model reason explicitly before calling a tool works much better than calling tools directly**.
 
-Why? Return to Chapter 8: CoT gives the model "scratch paper". In agent scenarios, what needs to be written on the "scratch paper" is "which tool should I use now, why, and with what parameters". Without this step, the model easily calls tools chaotically.
+Why? Return to Chapter 8: CoT gives the model "scratch paper". In agent scenarios, what needs to be written on the "scratch paper" is "which tool should I use now, why, and with what parameters". Without this step, the model can easily call tools chaotically.
 
 ### Modern Implementations
 
@@ -149,7 +149,7 @@ client.messages.create(
 )
 ```
 
-The pattern has not changed - thinking/tool_use/tool_result just use a structured schema instead of plain text.
+The pattern has not changed: thinking/tool_use/tool_result simply use a structured schema instead of plain text.
 
 ---
 
@@ -184,9 +184,9 @@ flowchart TD
     style Agent fill:#ffcdd2
 ```
 
-An LLM agent does not have the ability to "simulate in its mind". Its way of "thinking of the next step" is to actually do it.
+An LLM agent does not have the ability to "simulate in its mind". Its way of "thinking about the next step" is to actually take it.
 
-This leads to several typical failures:
+This leads to several common failures:
 
 **Failure 1: Inefficient detours**
 
@@ -204,7 +204,7 @@ Agent behavior:
   Action: read_file("/tmp/data/b.csv")
   ...
 
-(A single line of bash could actually do this)
+(A single line of bash could do this)
 ```
 
 **Failure 2: Getting stuck in a loop**
@@ -235,13 +235,13 @@ Agent behavior:
 (Cannot be undone)
 ```
 
-These are not cases of a poorly written prompt - they are **structural problems of autoregressive agents**.
+These are not examples of a poorly written prompt; they are **structural problems of autoregressive agents**.
 
 ---
 
 ## 11.4 Several Strategies for Mitigating the Lookahead Problem
 
-They cannot eliminate it, but they can mitigate it.
+These strategies cannot eliminate it, but they can mitigate it.
 
 ### Strategy 1: Have the Agent Write a Plan First
 
@@ -257,9 +257,9 @@ After writing the plan, wait for my confirmation before starting execution.
 """
 ```
 
-This expands the scale of "autoregressive generation" from tokens to **plan units**. When the model generates the "plan" section, it is still autoregressive, but the content being generated is a "description of the future", not actual execution - if it is wrong, it can be rewritten.
+This expands the scale of "autoregressive generation" from tokens to **plan units**. When the model generates the "plan" section, it is still autoregressive, but the generated content is a "description of the future", not actual execution. If it is wrong, it can be rewritten.
 
-Cost: one more round of conversation; the plan itself may be inaccurate. But it is better than executing directly.
+Cost: one more round of conversation; the plan itself may be inaccurate. But this is still better than executing directly.
 
 ### Strategy 2: Human-in-the-Loop
 
@@ -276,7 +276,7 @@ def execute_with_approval(tool_call):
     return execute(tool_call)
 ```
 
-This is not a technical problem; it is a product problem. Anthropic Computer Use and Claude Code both have similar "permission prompt" mechanisms - giving users a kill switch.
+This is not a technical problem; it is a product problem. Anthropic Computer Use and Claude Code both have similar "permission prompt" mechanisms, giving users a kill switch.
 
 ### Strategy 3: Limit the Search Space
 
@@ -297,7 +297,7 @@ def get_tools_for_task(task_type):
 tools = get_tools_for_task(classify(user_request))
 ```
 
-This is actually turning the problem of "agent improvisation" **partly back into "routing + constrained agent"**. The latter is more controllable.
+This turns the problem of "agent improvisation" **partly back into "routing + constrained agent"**. The latter is more controllable.
 
 ### Strategy 4: Limit Loop Depth and Width
 
@@ -323,7 +323,7 @@ def safe_agent_loop(task, max_steps=10, max_same_action_repeat=3):
     return "Reached maximum number of steps"
 ```
 
-Do not let the agent decide when to stop by itself - its judgment is unreliable.
+Do not let the agent decide when to stop by itself; its judgment is unreliable.
 
 ---
 
@@ -371,17 +371,17 @@ def reflexive_agent(task, max_attempts=3):
     return "All attempts failed"
 ```
 
-This pattern works because: **reviewing is easier than generating** - this is the asymmetry already discussed in Chapter 7.
+This pattern works because **reviewing is easier than generating**. This is the asymmetry already discussed in Chapter 7.
 
 ### Use Carefully: Limits of Self-Review
 
-But remember the warning from Chapter 7: the model's ability to self-review is limited. If the critic and actor are the same model in the same conversation context, the quality of reflection will drop significantly - it tends to defend its own mistakes.
+But remember the warning from Chapter 7: the model's ability to self-review is limited. If the critic and actor are the same model in the same conversation context, the quality of reflection will drop significantly; the model tends to defend its own mistakes.
 
 More reliable approaches:
 
 - Use a **different model** as the critic (for example, Sonnet as actor and Opus as critic)
-- Or **clear the context**, so the critic cannot see the actor's "train of thought" and only sees inputs and outputs
-- Or use a **deterministic verifier** (unit tests, assertions, schema checks) instead of a model critic
+- **Clear the context**, so the critic cannot see the actor's "train of thought" and only sees inputs and outputs
+- Use a **deterministic verifier** (unit tests, assertions, schema checks) instead of a model critic
 
 ---
 
@@ -389,10 +389,10 @@ More reliable approaches:
 
 ### The Temptation of "Multiple Agents"
 
-An intuitive idea: since a single agent is hard to manage, divide the work - one specialized for research, one specialized for coding, one specialized for review, collaborating with each other. CrewAI, AutoGen, and Anthropic's agent protocol are all pushing in this direction.
+An intuitive idea is that, since a single agent is hard to manage, we can divide the work: one agent specializes in research, one in coding, and one in review, with all of them collaborating. CrewAI, AutoGen, and Anthropic's agent protocol all move in this direction.
 
 Theoretical benefits:
-- **Focus**: each agent only does what it is good at, making prompts more focused
+- **Focus**: each agent only does what it is good at, which makes prompts more focused
 - **Parallelism**: independent tasks can proceed simultaneously
 - **Explainability**: clear division of labor makes debugging easier
 
@@ -419,7 +419,7 @@ flowchart LR
     style A3 fill:#fff9c4
 ```
 
-Every agent switch requires "translating" context into a form that another agent can understand. Information is lost and error is added in the middle.
+Every agent switch requires "translating" context into a form that another agent can understand. Information is lost and errors are introduced along the way.
 
 **Cost 2: Error contagion**
 
@@ -427,11 +427,11 @@ If Agent A's output contains a hallucination and Agent B treats it as true, the 
 
 **Cost 3: Evaluation difficulty**
 
-If a single agent makes a mistake, you can see the complete conversation. If multiple agents collaborate and make a mistake, you have to trace "whose fault it was" - perhaps A's output had a problem, perhaps B misunderstood it, perhaps the protocol itself was flawed.
+If a single agent makes a mistake, you can see the complete conversation. If multiple agents collaborate and make a mistake, you have to trace "whose fault it was": perhaps A's output had a problem, perhaps B misunderstood it, or perhaps the protocol itself was flawed.
 
 **Cost 4: Cost and latency**
 
-Every agent is an LLM call. Collaboration among 3 agents = at least 3x the calls, possibly more. If you want parallelism, engineering complexity also rises.
+Every agent is an LLM call. Collaboration among 3 agents = at least 3x the calls, and possibly more. If you want parallelism, engineering complexity also rises.
 
 ### Anthropic's Rule of Thumb
 
@@ -444,7 +444,7 @@ Anthropic's engineering article ([_Building Effective Agents_](https://www.anthr
 > - Or a "prompt + tools" loop
 > - Or several prompts chained together (a workflow, not an agent)
 
-Do not adopt a multi-agent framework just because it "sounds advanced". Build a single agent well first; only divide the work when you encounter a specific bottleneck.
+Do not adopt a multi-agent framework just because it "sounds advanced". Build a single agent well first; divide the work only when you encounter a specific bottleneck.
 
 ---
 
@@ -491,11 +491,11 @@ flowchart LR
 - If you can **draw the task's flowchart**, use a workflow
 - Use an agent only when **the process itself must change dynamically based on intermediate results**
 
-90% of products advertised as "agents" are actually workflows - and they are more reliable precisely because they are workflows.
+90% of products advertised as "agents" are actually workflows, and they are more reliable precisely because they are workflows.
 
 ### An Example
 
-Task: read a PDF uploaded by the user and answer questions about its content.
+Task: read a PDF uploaded by the user and answer questions about its contents.
 
 **Workflow implementation**:
 ```
@@ -512,7 +512,7 @@ Give the LLM tools: extract_pdf_text, chunk_text, search_chunks, answer_question
 Let the LLM decide the call order by itself
 ```
 
-Which is better? **In almost all cases, the workflow is better** - it is fast, cheap, and predictable. An agent only has an advantage when user questions are very diverse and require different retrieval strategies.
+Which is better? **In almost all cases, the workflow is better**: it is fast, cheap, and predictable. An agent only has an advantage when user questions are highly diverse and require different retrieval strategies.
 
 ---
 
@@ -522,7 +522,7 @@ Putting the previous content together, here are several effective agent design p
 
 ### Pattern 1: Router
 
-The simplest "agent" - dispatch to different workflows based on input.
+The simplest "agent" dispatches to different workflows based on input.
 
 ```python
 def router(user_input):
@@ -535,11 +535,11 @@ def router(user_input):
         return qa_workflow(user_input)
 ```
 
-The control flow is written by humans; the decisions are made by the LLM. Simple and reliable.
+The control flow is written by humans; the decisions are made by the LLM. This is simple and reliable.
 
 ### Pattern 2: Tool-Augmented LLM (Single-Loop ReAct)
 
-The most common true agent pattern: one LLM, a set of tools, and a loop. This is the standard usage of Anthropic Tool Use and OpenAI Function Calling.
+The most common true agent pattern is one LLM, a set of tools, and a loop. This is the standard usage of Anthropic Tool Use and OpenAI Function Calling.
 
 Suitable for: open-ended task structures that require a small number of tool calls (< 10 steps).
 
@@ -557,17 +557,17 @@ def plan_and_execute(task):
     return synthesize(results)
 ```
 
-Suitable for: tasks that can be planned in advance and have little dependency between steps.
+Suitable for: tasks that can be planned in advance and have few dependencies between steps.
 
 ### Pattern 4: Orchestrator-Workers
 
-An "orchestrator LLM" decides what needs to be done, and multiple "worker LLMs" execute in parallel. Results are then summarized.
+An "orchestrator LLM" decides what needs to be done, and multiple "worker LLMs" execute in parallel. The results are then summarized.
 
 Suitable for: tasks that can be parallelized (such as batch-processing multiple documents).
 
 ### Pattern 5: Reflection Loop
 
-Actor generates → Critic reviews → Actor improves → repeat until it passes.
+Actor generates → Critic reviews → Actor improves → repeat until the result passes.
 
 Suitable for: tasks with clear quality standards (code, articles).
 
@@ -606,7 +606,7 @@ Before pushing an agent to production, go through this checklist:
 - [ ] Tools have clear, LLM-friendly descriptions (not docstrings written for humans)
 - [ ] Tool inputs have JSON schema (not free text)
 - [ ] Tool outputs are readable by the LLM (structured, not too long)
-- [ ] Tool error messages suggest "how to fix it" (rather than only saying it failed)
+- [ ] Tool error messages suggest "how to fix it" (rather than only saying that the call failed)
 - [ ] Dangerous tools have an independent permission layer (confirmation/approval)
 
 ### Control Flow
@@ -647,14 +647,14 @@ Chapter 12 will discuss evaluation specifically.
 
 Looking back at the claim from the beginning of this chapter: **the best agent designs are often the simplest**.
 
-The reason complex agent systems fail is almost never that "the model is not strong enough" - it is complexity itself:
+The reason complex agent systems fail is almost never that "the model is not strong enough"; it is complexity itself:
 
 - Too many tools → the model chooses the wrong one
 - Too many steps → errors accumulate
 - Too many roles → communication is distorted
 - Too many abstractions → debugging becomes impossible
 
-And the reason simple agents succeed:
+And the reason simple agents succeed is:
 
 - Few tools + clear descriptions → the model chooses correctly
 - Few steps + each step verifiable → errors can be discovered
@@ -678,7 +678,7 @@ In agent design, **Occam's razor matters more than "AI thinking"**. If a workflo
 | Workflow vs Agent | Use a workflow if the process can be predefined; use an agent only when dynamic decisions are truly needed |
 | Design principle | Simpler is better. Complexity is the main root cause of agent failure |
 
-In the next chapter, we discuss a seriously underestimated part: **evaluation**. An agent without evals is essentially a demo.
+In the next chapter, we discuss a seriously underestimated topic: **evaluation**. An agent without evals is essentially a demo.
 
 ---
 

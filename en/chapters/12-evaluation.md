@@ -6,22 +6,22 @@
 
 > "If you can't measure it, you can't improve it. If you don't measure it, you'll definitely break it."
 
-At this point, we have discussed how models "think," the boundaries of their capabilities, prompts, knowledge injection, and agents. These are all tools on the building side. But there is one question we have been avoiding:
+At this point, we have discussed how models "think," the boundaries of their capabilities, prompts, knowledge injection, and agents. These are all tools for building systems. But there is one question we have been avoiding:
 
-**How do you know that what you built is good?**
+**How do you know that what you have built is good?**
 
-This is the step most easily skipped in LLM engineering. A common pattern: an engineer tunes a prompt, does a "vibe check," feels it is good enough, ships it, and three days later users report all kinds of failures. The engineer has no idea which change introduced the problem, because there was never a baseline.
+This is the easiest step to skip in LLM engineering. A common pattern: an engineer tunes a prompt, does a "vibe check," decides it is good enough, ships it, and three days later users report all kinds of failures. The engineer has no idea which change introduced the problem, because there was never a baseline.
 
 The nondeterminism, open output space, and long-tail failure modes of LLM systems make evaluation **much harder than in traditional software**. But precisely because it is hard, **the people who do it have a significant advantage**.
 
 The core arguments of this chapter:
 
-1. **An LLM system without evals is just a demo** -- it can be demonstrated, but it cannot be iterated on
+1. **An LLM system without evals is just a demo** -- it can be shown, but it cannot be iterated on reliably
 2. **Vibe checks are not enough, and benchmarks are not enough either** -- what you need is **task-specific evals**
 3. **LLM-as-judge is a double-edged sword** -- it can scale evaluation, but it has structural biases
 4. **Evaluation should drive development** -- write evals first, then tune the system
 
-After reading this chapter, you will have a practical evaluation methodology: from choosing metrics, to building an eval set, to embedding evals into CI to prevent regressions.
+After reading this chapter, you will have a practical evaluation methodology: choosing metrics, building an eval set, and embedding evals into CI to prevent regressions.
 
 ---
 
@@ -46,7 +46,7 @@ LLM evaluation is difficult for three reasons:
 **1. The output is an open space**
 
 For an ordinary function: input 1+1 -> the output must be 2.
-For an LLM: input "summarize this article" -> there are countless "correct" summaries.
+For an LLM: input "summarize this article" -> there are many possible "correct" summaries.
 
 You cannot test this with `assertEqual(output, expected)`, because there is no single expected output.
 
@@ -56,7 +56,7 @@ When Temperature > 0, the same input produces different outputs every time. Even
 
 **3. Long-tail failures**
 
-An LLM performs well 95% of the time, and fails the remaining 5% in **unexpected** ways. This 5% will not be found by random spot checks, but real users in production will trigger it with precision.
+An LLM performs well 95% of the time and fails the remaining 5% in **unexpected** ways. Random spot checks will not find this 5%, but real users in production will trigger it with precision.
 
 ```mermaid
 flowchart LR
@@ -73,7 +73,7 @@ flowchart LR
 
 ### Three Anti-Patterns
 
-The most common kinds of "fake evaluation" I have seen:
+The most common forms of "fake evaluation" I have seen:
 
 **Anti-pattern 1: Vibe check**
 
@@ -81,7 +81,7 @@ The most common kinds of "fake evaluation" I have seen:
 "I tried a few examples. They looked pretty good. Ship it."
 ```
 
-Problem: the few examples you tested are very likely easy cases, where the model would not make mistakes anyway. You will not think of the real boundary cases.
+Problem: the few examples you tested are likely easy cases where the model would not make mistakes anyway. You will not think of the real boundary cases.
 
 **Anti-pattern 2: Relying on general benchmarks**
 
@@ -89,7 +89,7 @@ Problem: the few examples you tested are very likely easy cases, where the model
 "Our model scores 85 on MMLU."
 ```
 
-Problem: benchmarks like MMLU, GPQA, and HumanEval measure the model's own capabilities, not the performance of **your specific application**. A model with a high MMLU score can still fail completely in your customer support scenario, for example by being too academic or too verbose.
+Problem: benchmarks like MMLU, GPQA, and HumanEval measure the model's own capabilities, not the performance of **your specific application**. A model with a high MMLU score can still fail completely in your customer support scenario, for example, by being too academic or too verbose.
 
 **Anti-pattern 3: "End users will tell us"**
 
@@ -97,13 +97,13 @@ Problem: benchmarks like MMLU, GPQA, and HumanEval measure the model's own capab
 "After launch, we'll iterate based on user feedback."
 ```
 
-Problem: user feedback is noisy and delayed. By the time you collect a statistically significant signal, you may already have lost many users. And users **will not tell you about the dissatisfaction they never voiced** -- they will quietly switch to someone else.
+Problem: user feedback is noisy and delayed. By the time you collect a statistically significant signal, you may already have lost many users. And users **will not tell you about dissatisfaction they never voiced** -- they will quietly switch to someone else.
 
 ---
 
 ## 12.2 Levels of Evaluation
 
-Do not lump all evaluation together. There are levels, and each level has a different goal.
+Do not lump all evaluation together. Evaluation has multiple levels, and each level has a different goal.
 
 ```mermaid
 flowchart TD
@@ -124,7 +124,7 @@ flowchart TD
 | L3 System evaluation | End-to-end task completion rate | Every release | Partly automatic + human |
 | L4 Production monitoring | Metrics on real traffic | Continuous | Automatic + sampled human review |
 
-Many teams only do L1, or not even that, and then ship straight to L4, production. The missing L2 and L3 layers mean that after a prompt changes, no one knows whether the overall system got better or worse.
+Many teams only do L1, or not even that, and then ship straight to L4: production. Without the L2 and L3 layers, no one knows whether the overall system got better or worse after a prompt change.
 
 ---
 
@@ -132,7 +132,7 @@ Many teams only do L1, or not even that, and then ship straight to L4, productio
 
 ### What Is an Eval Set?
 
-An eval set is a set of **representative inputs + corresponding judgment criteria**. It is your "ground truth."
+An eval set is a collection of **representative inputs + corresponding judgment criteria**. It is your "ground truth."
 
 ```python
 eval_set = [
@@ -154,11 +154,11 @@ eval_set = [
 ]
 ```
 
-Building a good eval set usually takes more time than writing code. But it is **the foundation of everything that follows**.
+Building a good eval set usually takes more time than writing code. But it is **the foundation for everything that follows**.
 
 ### How to Collect Inputs for an Eval Set
 
-Several sources, in order of quality:
+Several sources are useful, roughly in order of quality:
 
 **1. Real user inputs (highest quality)**
 
@@ -175,7 +175,7 @@ If you have not launched yet, you can run an internal alpha: let people inside t
 
 **2. Real failure cases (high value)**
 
-Every time production has an incident, add that input to the eval set. That way, the next time you change the system, this case is automatically tested to avoid regressions.
+Every time production has an incident, add that input to the eval set. That way, the next time you change the system, this case is automatically tested so you can avoid regressions.
 
 ```python
 # Standard process after a user reports a bug
@@ -213,15 +213,15 @@ Requirements:
 """
 ```
 
-Synthetic data is suitable as a **starting point**, but it should be replaced by real data as soon as possible.
+Synthetic data is useful as a **starting point**, but it should be replaced by real data as soon as possible.
 
 ### Eval Set Size
 
-How large is enough? Rules of thumb:
+How large is enough? Some rules of thumb:
 
 | Stage | Recommended Size | Use |
 |------|---------|------|
-| Early development | 20-50 | Iterate quickly and find the direction |
+| Early development | 20-50 | Iterate quickly and find the right direction |
 | Before launch | 200-500 | Systematic testing |
 | Stable production | 1000+ | Regression prevention + long-tail coverage |
 
@@ -231,9 +231,9 @@ Note: **quality > quantity**. 100 carefully selected inputs that cover a variety
 
 ## 12.4 How to "Judge" Whether an Output Is Good
 
-Once inputs have been collected, the next step is defining "what counts as a correct output." This is the truly hard part of LLM evaluation.
+Once inputs have been collected, the next step is defining "what counts as a correct output." This is the genuinely hard part of LLM evaluation.
 
-Here are several judge methods, listed from simple to complex:
+Here are several judging methods, listed from simple to complex:
 
 ### Judge Method 1: Exact Match
 
@@ -242,7 +242,7 @@ def exact_match(output, expected):
     return output.strip() == expected.strip()
 ```
 
-**Suitable for**: small and well-defined output spaces, such as classification and extraction tasks with only a limited number of possible answers.
+**Suitable for**: small, well-defined output spaces, such as classification and extraction tasks with only a limited number of possible answers.
 
 **Not suitable for**: open generation. Even when the semantics are correct, the wording may be completely different.
 
@@ -264,7 +264,7 @@ def matches_schema(output, schema):
         return False
 ```
 
-**Suitable for**: structured output. This is the most **underrated** eval in engineering: simple, cheap, and able to catch many basic errors.
+**Suitable for**: structured output. This is the most **underrated** eval in engineering: it is simple, cheap, and able to catch many basic errors.
 
 ### Judge Method 3: Contains Key Facts
 
@@ -285,7 +285,7 @@ eval_item = {
 
 **Suitable for**: QA and reasoning tasks, where you care whether the answer contains the correct facts.
 
-**Trap**: this can misjudge. For example, "the answer is not 11 but 12" also contains "11." You need something more precise.
+**Trap**: this can misjudge outputs. For example, "the answer is not 11 but 12" also contains "11." You need something more precise.
 
 ### Judge Method 4: Structured Extraction, Then Comparison
 
@@ -299,7 +299,7 @@ def evaluate_qa(output, expected_answer):
     return extracted == expected_answer
 ```
 
-Split "judging whether the model output is correct" into two steps: first **extract the key information**, then **exact match**. This is more reliable than direct LLM-judge.
+Split "judging whether the model output is correct" into two steps: first **extract the key information**, then **exact match**. This is more reliable than direct LLM judging.
 
 ### Judge Method 5: LLM-as-Judge
 
@@ -324,7 +324,7 @@ def llm_judge(input, output, criteria):
     return llm.generate(judge_prompt, model="claude-opus-4-7")
 ```
 
-**Suitable for**: open generation, subjective evaluation, and complex multidimensional judgment.
+**Suitable for**: open generation, subjective evaluation, and complex multidimensional judgments.
 
 But the next section is devoted to its traps.
 
@@ -337,7 +337,7 @@ def human_judge(input, output):
 
 **Suitable for**: the gold standard. Calibration of new metrics, disputed cases, and final acceptance.
 
-**Cost**: slow, expensive, and subject to inter-annotator agreement problems.
+**Cost**: slow, expensive, and subject to inter-annotator agreement issues.
 
 ### Selection Guide
 
@@ -367,21 +367,21 @@ flowchart TD
 
 LLM-as-judge solves a core bottleneck: **scaling evaluation**.
 
-Human evaluation is expensive; an annotator can only judge a few dozen samples per hour. But if you use an LLM as the judge:
+Human evaluation is expensive; an annotator can judge only a few dozen samples per hour. But if you use an LLM as the judge:
 
 - Speed improves by 100x
 - Cost drops to a fraction
 - It can cover more dimensions, evaluating factuality, fluency, usefulness, and safety at the same time
 
-Many evaluation pipelines run on LLM-as-judge: MT-Bench, AlpacaEval, partial automation in Chatbot Arena, and internal evals at many companies.
+Many evaluation pipelines use LLM-as-judge: MT-Bench, AlpacaEval, partial automation in Chatbot Arena, and internal evals at many companies.
 
 ### Known Biases
 
-But an LLM judge is not perfect. Research and practice have already found several systematic biases:
+But an LLM judge is not perfect. Research and practice have already identified several systematic biases:
 
 **Bias 1: Position Bias**
 
-If a model is asked to compare two answers, A and B, it tends to choose **the first** or **the second**. The tendency differs across models, but it exists in all of them.
+If a model is asked to compare two answers, A and B, it tends to favor **the first** or **the second**. The tendency differs across models, but it exists in all of them.
 
 ```python
 # Fix: run every pair twice, A vs B and B vs A, then average
@@ -392,7 +392,7 @@ final = (score_AB + (1 - score_BA)) / 2
 
 **Bias 2: Length Bias**
 
-LLM judges tend to prefer **longer** answers, even when longer does not mean better.
+LLM judges tend to prefer **longer** answers, even when longer does not mean better quality.
 
 ```python
 # Fix: explicitly tell the judge not to score based on length
@@ -404,7 +404,7 @@ A concise good answer should receive the same score as a detailed good answer.
 
 **Bias 3: Self-Preference**
 
-When GPT-4 acts as judge, it tends to prefer GPT-4 outputs. When Claude acts as judge, it prefers Claude outputs.
+When GPT-4 acts as judge, it tends to prefer GPT-4 outputs. When Claude acts as judge, it tends to prefer Claude outputs.
 
 ```python
 # Fix: use a model from a different family as the judge
@@ -414,11 +414,11 @@ When GPT-4 acts as judge, it tends to prefer GPT-4 outputs. When Claude acts as 
 
 **Bias 4: Style Over Substance**
 
-LLM judges are easily fooled by **attractive formatting**: bullet points, structured answers, and a confident tone score highly even when the content is wrong.
+LLM judges are easily fooled by **attractive formatting**: bullet points, structured answers, and a confident tone can score highly even when the content is wrong.
 
 **Bias 5: Rubric Interpretation Drift**
 
-Across time and different prompt wording, the judge's interpretation of the same rubric can vary. Calibration is needed.
+Over time and across different prompt wordings, the judge's interpretation of the same rubric can vary. Calibration is needed.
 
 ### How to Use It Relatively Reliably
 
@@ -446,13 +446,13 @@ def reliable_llm_judge(input, output):
     # 5. For critical decisions, validate judge reliability with human sampling
 ```
 
-**The most important rule**: **the LLM judge itself must be evaluated**. Regularly sample 10-20% of cases for human evaluation and compare the judge-human agreement. If agreement is significantly low (< 80%), the judge has a problem.
+**The most important rule**: **the LLM judge itself must be evaluated**. Regularly sample 10-20% of cases for human evaluation and compare judge-human agreement. If agreement is significantly low (< 80%), the judge has a problem.
 
 ---
 
 ## 12.6 Designing Evaluation Metrics
 
-Different tasks care about different metrics. Typical metrics for common tasks:
+Different tasks require different metrics. Typical metrics for common tasks:
 
 ### RAG Systems
 
@@ -479,8 +479,8 @@ Tools: [RAGAS](https://github.com/explodinggradients/ragas), [TruLens](https://g
 
 | Metric | Definition |
 |------|------|
-| Task Success Rate | Whether the task was ultimately completed |
-| Steps to Completion | How many steps were used to complete the task (fewer = more efficient) |
+| Task Success Rate | Whether the task was completed |
+| Steps to Completion | Number of steps used to complete the task (fewer = more efficient) |
 | Tool Call Accuracy | Whether the correct tool was called |
 | Tool Argument Validity | Whether tool arguments were valid |
 | Cost per Task | Total API cost to complete one task |
@@ -492,11 +492,11 @@ Classic ML metrics still apply:
 
 - Accuracy, Precision, Recall, F1
 - Confusion matrix
-- Per-class metrics (do not let macro averages hide small-class problems)
+- Per-class metrics (do not let macro averages hide problems in small classes)
 
 ### Open Generation
 
-The hardest scenario for defining metrics. Common approaches:
+This is the hardest scenario for defining metrics. Common approaches:
 
 - **Pairwise comparison**: compare outputs from two versions in an A/B setting and see which is better (more reliable than single-point scoring)
 - **Multi-dimension rubric**: evaluate by dimension (fluency, relevance, safety, usefulness...)
@@ -510,7 +510,7 @@ The hardest scenario for defining metrics. Common approaches:
 - PII leakage
 - Prompt injection success rate
 
-Do not forget **bidirectional** metrics: you need to test both "it refused when it should refuse" and "it did not refuse when it should not refuse." The latter is often neglected, leading to overly conservative systems.
+Do not forget **bidirectional** metrics: you need to test both "it refused when it should refuse" and "it did not refuse when it should not refuse." The latter is often neglected, which leads to overly conservative systems.
 
 ---
 
@@ -518,7 +518,7 @@ Do not forget **bidirectional** metrics: you need to test both "it refused when 
 
 ### Reversing the Order
 
-The order in traditional ML / engineering development:
+The usual order in traditional ML / engineering development:
 
 ```
 Write code -> run it and look -> feels pretty good -> write tests (if there is time)
@@ -533,7 +533,7 @@ Define eval -> run baseline -> improve -> run eval -> see whether it improved
 This is **eval-driven development**. Its benefits:
 
 1. Define "what is good" first, avoiding judgment by feel alone
-2. After changing a prompt, know immediately whether it got better or worse
+2. Know immediately whether a prompt change made things better or worse
 3. Quantitatively compare the effects of different changes
 4. Avoid breaking other things while fixing one problem (regression)
 
@@ -561,7 +561,7 @@ Run evals on every change, and base every decision on data. This loop looks slow
 
 ### Error Analysis Matters More Than Metrics
 
-After running evals, seeing a number like "78% pass rate" contains very little information by itself. **What matters is: what do the failing 22% look like?**
+After running evals, a number like "78% pass rate" contains very little information by itself. **What matters is: what do the failing 22% look like?**
 
 ```python
 # Standard process for error analysis
@@ -596,7 +596,7 @@ Error analysis tells you:
 
 ### Changing Prompts Is Like Changing Regular Expressions
 
-Anyone who has modified a complex regular expression knows: change one character, and something that used to match may stop matching; something that did not match may start matching. Prompt fragility is similar, perhaps worse, because it affects an open language space.
+Anyone who has modified a complex regular expression knows the problem: change one character, and something that used to match may stop matching; something that did not match may start matching. Prompt fragility is similar, and perhaps worse, because it affects an open language space.
 
 ```python
 # Imagine this scenario
@@ -610,7 +610,7 @@ Actual effects:
 - Overall token usage +20%
 ```
 
-You will not know about these changes without running evals.
+You will not know about these changes unless you run evals.
 
 ### CI Integration
 
@@ -635,7 +635,7 @@ jobs:
         # If the new branch's key metrics fall below 95% of main, CI fails
 ```
 
-This way, regressions run automatically before prompt changes are merged.
+This way, regression checks run automatically before prompt changes are merged.
 
 ### Evolution of the Eval Set Itself
 
@@ -652,7 +652,7 @@ An eval set is not something you write once and forget. It needs continuous main
 
 ## 12.9 A Complete RAG Eval Pipeline Example
 
-To put this chapter's content together, here is a complete example using a RAG system:
+To bring the chapter together, here is a complete example using a RAG system:
 
 ```python
 import json
@@ -720,18 +720,18 @@ Notice a few characteristics:
 
 - **Multi-level metrics**: retrieval, generation, and system-level metrics are all covered
 - **Mixed judges**: deterministic metrics (recall) + LLM judge (faithfulness)
-- **Not only averages**: pull out failure cases so you can do error analysis
+- **Not just averages**: pull out failure cases so you can do error analysis
 - **Can be added to CI**: run it every time the RAG system changes
 
 ---
 
 ## 12.10 The Boundaries and Future of LLM Evaluation
 
-The final section acknowledges the limitations of evaluation methods:
+This final section acknowledges the limitations of evaluation methods:
 
 ### 1. You Cannot Measure "Unknown Unknowns"
 
-Any eval set is a **collection of known failure modes**. The things that truly kill you in production are often boundary cases you never imagined.
+Any eval set is a **collection of known failure modes**. The failures that cause serious production damage are often boundary cases you never imagined.
 
 Response: **production monitoring** + **continuous red teaming** -- have people actively try to break the system.
 
@@ -743,13 +743,13 @@ Response: use a model **stronger** than the system being evaluated as the judge,
 
 ### 3. Benchmark Gaming
 
-Any fixed eval set, if iterated on repeatedly for long enough, will eventually be "overfit" by the model/system. The metric looks like it is rising, but generalization has not improved.
+If you iterate against any fixed eval set for long enough, the model/system will eventually "overfit" to it. The metric looks like it is improving, but generalization has not improved.
 
 Response: **hold-out set** (keep a test set that is never used for iteration) + regularly update the eval set.
 
 ### 4. The Marginal Cost of Evaluation
 
-Running one full eval may cost dozens of dollars and several hours. If you run it for every small change, iteration slows down.
+A full eval may cost dozens of dollars and take several hours. If you run it for every small change, iteration slows down.
 
 Response: **tiered evals**: fast sanity checks (dozens of samples, seconds) + full regression runs (hundreds to thousands of samples, before release).
 
@@ -766,9 +766,9 @@ Response: **tiered evals**: fast sanity checks (dozens of samples, seconds) + fu
 | How should outputs be judged? | Prefer deterministic metrics; calibrate LLM-judge; use humans for high-stakes cases |
 | What are the pitfalls of LLM-judge? | Position bias, length bias, self-preference, style over substance |
 | When should evals be built? | Before writing the first line of system code: eval-driven development |
-| How do you prevent prompt degradation? | Put evals in CI and run automatic regression on every PR |
+| How do you prevent prompt degradation? | Put evals in CI and run automated regression checks on every PR |
 
-In the next chapter, we enter Part IV: frontier topics. From the "black box" of evaluation, we move toward interpretability: opening the model and seeing what it is actually computing inside.
+In the next chapter, we enter Part IV: frontier topics. From the "black box" of evaluation, we move toward interpretability: opening the model and seeing what it is actually computing internally.
 
 ---
 
