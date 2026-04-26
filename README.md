@@ -3,7 +3,7 @@
 > 从 next-token prediction 的本质出发，理解 LLM 的思维机制，掌握构建 LLM 系统的第一性原理。
 
 **Languages**: [中文](README.md) | [English](en/README.md)
-**在线阅读**：[yingwang.github.io/thinking-in-llm](https://yingwang.github.io/thinking-in-llm/)（搜索、暗色、目录侧栏）
+**在线阅读**：[yingwang.github.io/thinking-in-llm](https://yingwang.github.io/thinking-in-llm/)
 
 面向有编程基础、在用或想用 LLM 构建产品的工程师。不要求机器学习背景。
 
