@@ -2,6 +2,8 @@
 
 > 从 next-token prediction 的本质出发，理解 LLM 的思维机制，掌握构建 LLM 系统的第一性原理。
 
+**English version**: [Thinking in LLM](en/README.md)
+
 面向有编程基础、在用或想用 LLM 构建产品的工程师。不要求机器学习背景。
 
 ## 这本书的逻辑
