@@ -19,7 +19,7 @@ The impressive abilities you hear about in LLMs, such as writing poetry, program
 
 A language model is essentially a probability distribution:
 
-$$P(\text{next\_token} \mid \text{previous\_tokens})$$
+$$P(\text{next token} \mid \text{previous tokens})$$
 
 Given all previous tokens, the model outputs a probability distribution over possible next tokens. That is all. There is no "understanding" module, no "reasoning" engine, and no "knowledge-base query", just this one probability distribution.
 
@@ -330,7 +330,7 @@ The capital of China is Beijing.
 
 This means that, from a probabilistic perspective, what a dialogue model is really doing is:
 
-$$P(\text{response} \mid \text{system\_prompt}, \text{chat\_history}, \text{user\_message})$$
+$$P(\text{response} \mid \text{system prompt},\ \text{chat history},\ \text{user message})$$
 
 The model is still doing next-token prediction. Only the conditioning has changed.
 

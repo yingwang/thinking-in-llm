@@ -19,7 +19,7 @@
 
 一个语言模型本质上是一个概率分布：
 
-$$P(\text{next\_token} \mid \text{previous\_tokens})$$
+$$P(\text{next token} \mid \text{previous tokens})$$
 
 给定之前所有的 token，模型输出一个概率分布，表示下一个 token 最可能是什么。就这样。没有"理解"模块，没有"推理"引擎，没有"知识库查询"——只有这一个概率分布。
 
@@ -330,7 +330,7 @@ response = client.messages.create(
 
 这意味着从概率的角度，对话模型做的事情其实是：
 
-$$P(\text{response} \mid \text{system\_prompt}, \text{chat\_history}, \text{user\_message})$$
+$$P(\text{response} \mid \text{system prompt},\ \text{chat history},\ \text{user message})$$
 
 模型仍然在做 next-token prediction，只是条件（conditioning）变了。
 
