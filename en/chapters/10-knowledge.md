@@ -4,751 +4,412 @@
 
 # Chapter 10: Three Paths for Knowledge Injection
 
-> "An LLM without external knowledge is like a brilliant person with amnesia — great at thinking, terrible at remembering."
+> "A foundation model devoid of external grounding resembles a brilliant scholar afflicted with amnesia: possessing profound deductive faculties, yet unable to recall yesterday's enterprise ledger."
 
-An LLM's training data has a cutoff date, its parameters have finite capacity, and its context window has a length limit. When your application needs the model to answer questions about "things it does not know," you need to **inject knowledge**.
+Foundation models operate under three fundamental constraints: static training cutoff horizons, finite parameter memory capacities, and bounded context windows. When an enterprise application demands that a model reason over dynamic, private, or real-time proprietary data, the system must execute **knowledge injection**.
 
-**Core argument: RAG, fine-tuning, and long context are three fundamentally different ways to inject knowledge, each suited to different scenarios. Choosing the wrong one is not just a matter of poor results; it means heading in the wrong direction.**
+**Central Thesis: Retrieval-Augmented Generation (RAG), parameter fine-tuning, and ultra-long context windows represent three mathematically distinct paradigms for knowledge injection. Selecting the wrong path does not merely yield suboptimal performance; it anchors the system in an unsustainable engineering architectural dead end.**
 
 ---
 
-## 10.1 Three Ways to Inject Knowledge
+## 10.1 The Tripartite Taxonomy of Knowledge Injection
 
-### An Exam Analogy
+### The Academic Examination Metaphor
 
-The best analogy for understanding the three approaches is an exam:
+To understand the operational trade-offs of these three paradigms, consider the analogy of an academic examination:
 
-| Approach | Analogy | Where the knowledge lives | Update cost |
-|------|------|-----------|---------|
-| **RAG** | Open-book exam: bring reference books into the exam room | External database (retrieved at runtime) | Low (just update the database) |
-| **Fine-tuning** | Studying for months: knowledge committed to memory | Model weights (written during training) | High (requires retraining) |
-| **Long Context** | Last-minute cramming before the exam: read the whole book once | Prompt context (passed in on each call) | None (just swap the document) |
-
-### RAG (Retrieval-Augmented Generation)
+| Dimension | Retrieval-Augmented Generation (RAG) | Supervised Fine-Tuning (SFT) | Ultra-Long Context Windows |
+|---|---|---|---|
+| **Cognitive Analogy** | **Open-Book Examination**: Consults external technical manuals at runtime. | **Intensive Cramming**: Internalizes syntactic reflexes into neural memory over months. | **Total Working Memory**: Ingests the entire textbook directly into active working memory. |
+| **Knowledge Locus** | External Vector Database / Search Index | Synaptic Model Weights ($\mathbf{W} \in \mathbb{R}^{d_1 \times d_2}$) | In-Memory Attention KV Cache |
+| **Update Latency** | Instantaneous ($O(1)$ database insertion) | High (Requires compute cluster re-training) | Zero (Dynamic payload swapping) |
+| **Primary Domain** | Dynamic factual retrieval, private documentation | Specialized formatting, stylistic tone, reasoning policies | Global document synthesis, multi-clause legal audits |
+| **Hallucination Risk** | Bounded by retrieved grounding citations | High (Susceptible to parametric drift) | Medium (Vulnerable to attention dilution) |
 
 ```mermaid
-flowchart LR
-    Q[User question] --> R[Retriever]
-    R --> D[(Document corpus)]
-    D --> R
-    R --> |Relevant documents| G[LLM generation]
-    Q --> G
-    G --> A[Answer]
+flowchart TD
+    subgraph RAG["Retrieval-Augmented Generation (Runtime Grounding)"]
+        R1["User Query"] --> R2["Retriever"]
+        R2 --> R3[("External Knowledge Store")]
+        R3 --> R2
+        R2 -->|"Top-K Passages"| R4["Inference LLM"]
+        R1 --> R4
+        R4 --> R5["Grounded Output + Citations"]
+    end
+
+    subgraph SFT["Fine-Tuning (Parametric Imprinting)"]
+        S1["Domain Corpora"] --> S2["Backpropagation Training"]
+        S2 --> S3["Modified Weights (W + ΔW)"]
+        S4["User Query"] --> S3
+        S3 --> S5["Stylized Output"]
+    end
+
+    subgraph LongContext["Long Context (KV Cache Ingestion)"]
+        L1["Complete 1M-Token Corpus"] --> L2["Direct KV Attention Cache"]
+        L3["User Query"] --> L2
+        L2 --> L4["Synthesized Output"]
+    end
+
+    style RAG fill:#e3f2fd,stroke:#1565c0
+    style SFT fill:#fff3e0,stroke:#e65100
+    style LongContext fill:#e8f5e9,stroke:#2e7d32
 ```
-
-**Core idea**: Do not store knowledge in the model; look it up when needed.
-
-```python
-# The simplest RAG implementation
-def rag_answer(question: str, documents: list[str]) -> str:
-    # 1. Retrieve relevant documents
-    relevant_docs = retrieve(question, documents, top_k=3)
-
-    # 2. Pass the retrieved documents and the question to the LLM together
-    prompt = f"""Answer the user's question based on the following reference materials. If the materials do not contain relevant information, say "I'm not sure."
-
-Reference materials:
-{chr(10).join(relevant_docs)}
-
-Question: {question}
-Answer:"""
-
-    return call_llm(prompt)
-```
-
-**Advantages**: Knowledge can be updated in real time; sources can be traced through citations; the model does not need retraining.
-**Disadvantages**: Depends on retrieval quality; adds latency; retrieval failure means answer failure.
-
-### Fine-tuning
-
-**Core idea**: Use additional training to write knowledge or behavior patterns into model weights.
-
-```python
-# Fine-tuning data format (SFT)
-training_data = [
-    {
-        "messages": [
-            {"role": "system", "content": "You are a medical customer support assistant who answers questions about our products."},
-            {"role": "user", "content": "What is the dosage for product X?"},
-            {"role": "assistant", "content": "The recommended dosage for product X is twice daily, one tablet each time. Take it after meals."}
-        ]
-    },
-    # ... more training examples
-]
-```
-
-**Advantages**: Changes the model's behavior, style, or format; no extra retrieval is needed at inference time; low latency.
-**Disadvantages**: High training cost; knowledge updates require retraining; easy to overfit.
-
-### Long Context
-
-**Core idea**: Put all relevant information directly into the prompt.
-
-```python
-# A naive long-context implementation
-def answer_with_full_context(question: str, all_docs: str) -> str:
-    prompt = f"""The following is the complete product documentation:
-
-{all_docs}
-
-Answer based on the documentation above: {question}"""
-
-    return call_llm(prompt)  # May consume 100K+ tokens
-```
-
-**Advantages**: The simplest option: no retrieval pipeline, no training, and all information is in the context.
-**Disadvantages**: Expensive because it is billed by token; constrained by length limits; vulnerable to the "lost in the middle" problem.
 
 ---
 
-## 10.2 RAG in Depth
+## 10.2 Retrieval-Augmented Generation (RAG) Architecture and Vector Mechanics
 
-RAG is the most commonly used method for knowledge injection. Let's break down each part.
+RAG decouples knowledge storage from parametric reasoning: the foundation model functions as an inference engine, while external storage serves as the system of record.
 
-### Complete RAG Pipeline
+### The Complete Production RAG Pipeline
 
 ```mermaid
 flowchart TB
-    subgraph OfflineIndex["Offline Indexing Stage"]
-        D[Raw documents] --> S[Document chunking<br/>Chunking]
-        S --> E[Embedding<br/>Vectorization]
-        E --> I[(Vector database<br/>Vector Store)]
+    subgraph Ingestion["Offline Ingestion & Indexing Pipeline"]
+        RawDocs["Raw Unstructured Documents<br/>(PDF, Markdown, SQL)"] --> Chunking["Semantic Chunking Engine<br/>(Sliding Window / Heading Hierarchies)"]
+        Chunking --> EmbedModel["Dense Embedding Model<br/>(e.g., text-embedding-3-large)"]
+        EmbedModel --> VectorStore[("Hierarchical Vector Store<br/>(HNSW / IVF-PQ Index)")]
+        Chunking --> SparseIndex[("Sparse BM25 Inverted Index")]
     end
 
-    subgraph OnlineQuery["Online Query Stage"]
-        Q[User question] --> QE[Query Embedding]
-        QE --> VS[Vector search]
-        I --> VS
-        VS --> |Top-K candidates| RR[Reranking<br/>Reranker]
-        RR --> |Top-N results| P[Construct Prompt]
-        Q --> P
-        P --> LLM[LLM generation]
-        LLM --> A[Final answer]
+    subgraph Serving["Online Query & Grounding Pipeline"]
+        Query["Incoming User Query"] --> DenseQuery["Dense Vectorizer"]
+        Query --> SparseQuery["Sparse Tokenizer"]
+        
+        DenseQuery --> VectorStore
+        SparseQuery --> SparseIndex
+        
+        VectorStore -->|"Top-K Dense Matches"| HybridFusion["Reciprocal Rank Fusion (RRF)"]
+        SparseIndex -->|"Top-K Sparse Matches"| HybridFusion
+        
+        HybridFusion -->|"Top-M Candidates"| NeuralRerank["Cross-Encoder Neural Reranker<br/>(bge-reranker-v2-m3)"]
+        NeuralRerank -->|"Top-N Grounded Chunks"| PromptAssemble["Prompt Assembler & Context Compressor"]
+        Query --> PromptAssemble
+        PromptAssemble --> GeneratorLLM["LLM Synthesis Layer"]
+        GeneratorLLM --> FinalAnswer["Verified Grounded Output with Citations"]
     end
 
-    style OfflineIndex fill:#e3f2fd,stroke:#1565c0
-    style OnlineQuery fill:#e8f5e9,stroke:#2e7d32
+    style Ingestion fill:#e3f2fd,stroke:#1565c0
+    style Serving fill:#e8f5e9,stroke:#2e7d32
 ```
 
-### Embedding: Turning Text into Vectors
+### Embedding Mechanics: High-Dimensional Semantic Geometry
 
-An embedding model maps a piece of text into a high-dimensional vector space. Texts with similar meanings are close to each other in that space.
+An embedding model $f_\theta: \mathcal{X} \to \mathbb{R}^d$ maps variable-length natural language sequences into a dense continuous metric space:
 
-```python
-from openai import OpenAI
-client = OpenAI()
+$$\mathbf{v} = \frac{f_\theta(\text{text})}{\|f_\theta(\text{text})\|_2}$$
 
-def get_embedding(text: str) -> list[float]:
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text
-    )
-    return response.data[0].embedding
+Semantic similarity is evaluated via the inner product (cosine similarity over normalized unit vectors):
 
-# Semantically similar texts -> close vector distances
-v1 = get_embedding("Python is a programming language")
-v2 = get_embedding("Python is a computer programming language")
-v3 = get_embedding("The weather is nice today")
+$$\text{sim}(\mathbf{u}, \mathbf{v}) = \cos(\theta) = \mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^{d} u_i v_i$$
 
-import numpy as np
-def cosine_sim(a, b):
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+### Chunking Strategies: The Critical Engineering Bottleneck
 
-print(cosine_sim(v1, v2))  # ~0.95 (very similar)
-print(cosine_sim(v1, v3))  # ~0.30 (unrelated)
-```
-
-A good embedding model needs:
-- **Discriminative power**: similar texts are close, dissimilar texts are far
-- **Robustness**: synonyms and word-order changes should not significantly change the vector
-- **Cross-lingual capability**: if your data is multilingual
-
-### Chunking: The Most Underestimated Engineering Decision
-
-Chunking is the process of cutting long documents into smaller pieces. This seemingly simple step often determines the performance ceiling of a RAG system.
+Chunking partitions monolithic text into discrete retrieval units. An optimal chunk preserves atomic semantic context while remaining sufficiently narrow to prevent relevance dilution.
 
 ```python
-# Strategy 1: Fixed-size splitting (simple but crude)
-def fixed_size_chunks(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunks.append(text[start:end])
-        start = end - overlap  # Overlap keeps the context continuous
-    return chunks
+import re
+from typing import List
 
-# Strategy 2: Semantic splitting (by natural boundaries such as paragraphs and headings)
-def semantic_chunks(text: str) -> list[str]:
-    # Split by headings
-    sections = re.split(r'\n#{1,3}\s', text)
-
-    chunks = []
-    for section in sections:
-        if len(section) > MAX_CHUNK_SIZE:
-            # Split long paragraphs further by sentence
-            sentences = re.split(r'[。！？\n]', section)
-            current_chunk = ""
-            for sent in sentences:
-                if len(current_chunk) + len(sent) > MAX_CHUNK_SIZE:
-                    chunks.append(current_chunk)
-                    current_chunk = sent
-                else:
-                    current_chunk += sent
-            if current_chunk:
-                chunks.append(current_chunk)
+def semantic_markdown_chunker(
+    text: str,
+    max_chunk_tokens: int = 512,
+    overlap_tokens: int = 64
+) -> List[str]:
+    """Hierarchical chunking respecting markdown heading boundaries and paragraph continuity."""
+    # Partition along top-level structural markdown headers
+    structural_sections = re.split(r'\n(?=#{1,3}\s)', text)
+    processed_chunks: List[str] = []
+    
+    for section in structural_sections:
+        if len(section.split()) <= max_chunk_tokens:
+            processed_chunks.append(section.strip())
         else:
-            chunks.append(section)
-    return chunks
-
-# Strategy 3: Recursive splitting (LangChain default)
-# First split by \n\n; if too long, split by \n; if still too long, split by .; finally split by character
+            # Fallback to sliding window token decomposition with overlap
+            paragraphs = section.split('\n\n')
+            current_buffer = ""
+            for para in paragraphs:
+                if len((current_buffer + para).split()) > max_chunk_tokens:
+                    if current_buffer:
+                        processed_chunks.append(current_buffer.strip())
+                    current_buffer = para[-overlap_tokens:] + "\n\n" + para
+                else:
+                    current_buffer += "\n\n" + para
+            if current_buffer:
+                processed_chunks.append(current_buffer.strip())
+                
+    return processed_chunks
 ```
 
-**Tradeoffs in chunk size**:
+#### Chunk Sizing Trade-offs
 
-| Chunk too small | Chunk too large |
-|-----------|-----------|
-| Loses context (who does "he" refer to?) | Dilutes relevance (only one sentence in a large passage is useful) |
-| High retrieval precision, but incomplete recall | Retrieved, but the LLM must find the answer in long text |
-| Suitable for precise factual queries | Suitable for questions that need complete arguments |
+| Strategy | Advantages | Failure Modes |
+|---|---|---|
+| **Micro-Chunks ($< 128$ tokens)** | High vector resolution; minimizes noise. | Shatters semantic context; coreferent pronouns lose antecedent grounding. |
+| **Macro-Chunks ($> 1024$ tokens)** | Retains complete structural arguments and context. | Dilutes dense vector representations; clutters context window with irrelevant noise. |
+| **Optimal Production Baseline** | **$384–512$ tokens with $10–20\%$ overlap**. | Strikes the empirical balance between semantic specificity and surrounding context. |
 
-**Practical advice**: Start with 500-1000-token chunks, add 10-20% overlap, and then adjust based on evaluation results.
+### Approximate Nearest Neighbor (ANN) Indexing: HNSW vs. IVF-PQ
 
-### Vector Search: HNSW vs IVF
+Exact nearest neighbor search scales as $\mathcal{O}(N \cdot d)$, creating unacceptable latency across million-vector enterprise corpora. Production vector engines deploy Approximate Nearest Neighbor (ANN) index structures:
 
-The core problem in vector retrieval is quickly finding the most similar top-K items among millions of vectors. The time complexity of exact search (brute-force comparison) is O(n), which is unacceptable at scale. That is why we use approximate nearest neighbor (ANN) algorithms.
+1. **Hierarchical Navigable Small World (HNSW)**:
+   - Constructs a multi-layered geometric skip-graph over dense vectors.
+   - Top layers execute coarse multi-hop traversal; bottom layers execute fine-grained local beam search.
+   - **Characteristics**: Sub-millisecond query latency and high recall ($>98\%$), at the cost of high RAM consumption ($\sim 1.5–2\times$ raw vector memory).
+2. **Inverted File with Product Quantization (IVF-PQ)**:
+   - Partitions vector space via Voronoi clustering (IVF) and compresses sub-vectors into low-bit discrete byte centroids (PQ).
+   - **Characteristics**: High compression ratios ($4\times–16\times$ RAM savings), suitable for billion-scale corpora, with a minor penalty to raw recall ($90–95\%$).
 
-**HNSW (Hierarchical Navigable Small World)**:
-- Builds a multilayer graph structure, where each layer acts as a "shortcut path" over the layer below
-- Starts searching from the top layer and refines the search layer by layer
-- Advantages: fast search (millisecond-level), high recall
-- Disadvantages: large memory footprint (all vectors plus the graph structure are in memory)
-- Suitable for: datasets up to the million-vector scale
+### Hybrid Sparse-Dense Search and Neural Reranking
 
-**IVF+PQ (Inverted File Index + Product Quantization)**:
-- IVF: first clusters the vector space, then searches only within relevant clusters
-- PQ: compresses high-dimensional vectors into short codes, reducing storage and computation
-- Advantages: memory-efficient, can handle hundreds of millions of vectors
-- Disadvantages: recall is slightly lower than HNSW
-- Suitable for: large-scale datasets
+Pure dense vector search struggles with **exact keyword lookups** (alphanumeric product SKUs, function identifiers, specific legal clause codes). Conversely, sparse lexical search (BM25) fails on **semantic paraphrasing**.
 
-```python
-# Use FAISS to build a vector index
-import faiss
-import numpy as np
+Production engines deploy **Hybrid Search with Reciprocal Rank Fusion (RRF)**:
 
-dimension = 1536  # Dimension of text-embedding-3-small
-n_vectors = 100000
+$$\text{RRF\_Score}(d \in D) = \sum_{m \in \{\text{Dense}, \text{Sparse}\}} \frac{1}{k + r_m(d)}$$
 
-# HNSW index
-index_hnsw = faiss.IndexHNSWFlat(dimension, 32)  # 32 = number of neighbors per node
-index_hnsw.add(vectors)
+where $k \approx 60$ is a smoothing constant, and $r_m(d)$ denotes the ordinal rank of document $d$ within retriever $m$.
 
-# IVF+PQ index (suitable for larger scale)
-nlist = 100  # Number of clusters
-m = 48       # Number of PQ subvectors
-quantizer = faiss.IndexFlatL2(dimension)
-index_ivfpq = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, 8)
-index_ivfpq.train(vectors)
-index_ivfpq.add(vectors)
+```mermaid
+flowchart LR
+    Query["Search Query"] --> DenseRetriever["Dense ANN (HNSW)"]
+    Query --> SparseRetriever["Sparse Lexical (BM25)"]
+    
+    DenseRetriever -->|"Top 100 Candidates"| Fusion["Reciprocal Rank Fusion (RRF)"]
+    SparseRetriever -->|"Top 100 Candidates"| Fusion
+    
+    Fusion -->|"Merged Top 30 Candidates"| CrossEncoder["Cross-Encoder Neural Reranker<br/>(Full Attention over Query x Chunk)"]
+    CrossEncoder -->|"Top 5 Filtered Passages"| Context["LLM Context Window"]
 
-# Search
-query_vector = get_embedding("How do you deploy a RAG system?")
-distances, indices = index_hnsw.search(
-    np.array([query_vector]).astype('float32'), k=10
-)
+    style DenseRetriever fill:#bbdefb,stroke:#0d47a1
+    style SparseRetriever fill:#fff9c4,stroke:#fbc02d
+    style CrossEncoder fill:#c8e6c9,stroke:#1b5e20
 ```
 
-### Hybrid Search: Vectors + Keywords
-
-The weakness of pure vector search is that it is not good at **exact matches** (product names, error codes, people's names). The weakness of BM25 (classic keyword search) is that it does not understand semantics ("how to lose weight" and "weight loss methods" use different wording).
-
-Solution: combine the two.
-
-```python
-# Pseudocode for hybrid search
-def hybrid_search(query: str, top_k: int = 10) -> list[Document]:
-    # Vector search: semantic matching
-    vector_results = vector_store.search(
-        embedding=get_embedding(query),
-        top_k=top_k * 2
-    )
-
-    # BM25 search: keyword matching
-    bm25_results = bm25_index.search(
-        query=query,
-        top_k=top_k * 2
-    )
-
-    # Reciprocal Rank Fusion (RRF) to merge rankings
-    scores = {}
-    k = 60  # RRF constant
-    for rank, doc in enumerate(vector_results):
-        scores[doc.id] = scores.get(doc.id, 0) + 1 / (k + rank + 1)
-    for rank, doc in enumerate(bm25_results):
-        scores[doc.id] = scores.get(doc.id, 0) + 1 / (k + rank + 1)
-
-    # Sort by merged score
-    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return [get_doc(doc_id) for doc_id, _ in ranked[:top_k]]
-```
-
-### Reranker: Fine Ranking
-
-Vector search and BM25 are both "two-tower models": the query and document are encoded independently, and then their vectors are compared. This is fast but coarse.
-
-A cross-encoder reranker concatenates the query and document as input, letting the model see their **interaction** and produce a more accurate relevance score.
-
-```python
-# Rerank with a cross-encoder
-from sentence_transformers import CrossEncoder
-
-reranker = CrossEncoder('BAAI/bge-reranker-v2-m3')
-
-def rerank(query: str, documents: list[str], top_n: int = 5) -> list[str]:
-    # Construct [query, doc] pairs
-    pairs = [[query, doc] for doc in documents]
-
-    # Cross-encoder scoring
-    scores = reranker.predict(pairs)
-
-    # Sort by score
-    ranked = sorted(zip(documents, scores), key=lambda x: x[1], reverse=True)
-    return [doc for doc, _ in ranked[:top_n]]
-```
-
-**Why not use a cross-encoder for search directly?** Because it is too slow. A cross-encoder has to concatenate the query with every document and run the model once. One million documents means one million model runs. In practice, the pattern is always: first use a fast method (vector/BM25) to roughly select the top 100, then use a cross-encoder to fine-rank the top 10.
+The combined candidate pool is subsequently scored by a **Cross-Encoder Neural Reranker** (such as `BAAI/bge-reranker-large`), which evaluates all cross-attention interactions between query and candidate tokens.
 
 ---
 
-## 10.3 RAG Optimization
+## 10.3 Advanced Retrieval Paradigms
 
-After the basic RAG pipeline is in place, there are many ways to optimize it.
+Beyond the standard retrieval loop, advanced production systems leverage dynamic query transformation and multi-scale chunk architectures:
 
-### Query Expansion: Improving the Retrieval Entry Point
+### Hypothetical Document Embeddings (HyDE)
 
-User queries are often not precise enough, or they do not match the wording used in the documents.
+User queries are typically short, abstract questions, whereas target document chunks are declarative paragraphs. This creates a geometric mismatch in dense embedding space.
 
-```python
-def expand_query(original_query: str) -> list[str]:
-    """Have the LLM generate multiple search queries"""
-    prompt = f"""The user asked the following question:
-{original_query}
+**HyDE** ([Gao et al., 2022](https://arxiv.org/abs/2212.10496)) instructs an LLM to hallucinate a plausible hypothetical answer to the query first, then embeds that synthetic document to execute dense retrieval against the vector database:
 
-Please generate 3 different search queries to help find relevant information.
-Each query should express the same information need from a different angle.
-Only output the queries, one per line."""
+```mermaid
+flowchart LR
+    UserQ["Query: 'How to remediate PostgreSQL connection exhaustion?'"] --> LLMGen["LLM (Zero-Shot)"]
+    LLMGen --> SynthDoc["Hypothetical Technical Answer<br/>(Declarative text with pooling terms)"]
+    SynthDoc --> Embedder["Embedding Model"]
+    Embedder --> VectorDB[("Vector Store Search")]
+    VectorDB --> RealDocs["Grounded Real Internal Docs"]
 
-    expanded = call_llm(prompt)
-    queries = [original_query] + expanded.strip().split('\n')
-    return queries
-
-# Example:
-# Original query: "How does Python handle large files?"
-# After expansion:
-# - "How does Python handle large files?"
-# - "Python memory optimization methods for reading large files"
-# - "Python streaming file processing"
-# - "Best practices for processing GB-scale files in Python"
+    style SynthDoc fill:#fff9c4,stroke:#fbc02d
+    style RealDocs fill:#c8e6c9,stroke:#1b5e20
 ```
 
-### HyDE: Hypothetical Document Embeddings
+### Hierarchical Small-to-Big Retrieval (Parent Document Retriever)
 
-A clever trick: instead of searching directly with the query, first ask the LLM to generate a "hypothetical answer," then search using the embedding of that answer.
+To resolve the tension between small chunks (optimal for retrieval precision) and large passages (optimal for generative context), the **Parent Document Retriever** indexes fine-grained 128-token child chunks in the vector store, each maintaining a foreign key reference to a parent 1024-token document:
 
 ```python
-def hyde_search(query: str, vector_store) -> list[str]:
-    """Hypothetical Document Embeddings"""
-    # Step 1: Ask the LLM to generate a hypothetical answer
-    hypothetical_answer = call_llm(
-        f"Please answer the following question (even if you are not completely sure):\n{query}"
-    )
+class HierarchicalParentRetriever:
+    """Index fine child chunks for vector search; resolve to parent chunks for LLM context."""
+    def __init__(self, vector_client, doc_store):
+        self.vector_client = vector_client
+        self.doc_store = doc_store  # Key-value mapping: parent_id -> full text
 
-    # Step 2: Search with the embedding of the hypothetical answer
-    # Reason: the hypothetical answer is closer to the real document in semantic space
-    # (while the query is usually a short question and differs greatly from document wording)
-    embedding = get_embedding(hypothetical_answer)
-    results = vector_store.search(embedding, top_k=10)
-
-    return results
+    def search(self, query: str, top_k: int = 4) -> List[str]:
+        # Step 1: Execute ANN search on granular 128-token child embeddings
+        child_matches = self.vector_client.search(query, top_k=top_k * 3)
+        
+        # Step 2: Extract distinct parent chunk IDs
+        unique_parent_ids = list(dict.fromkeys([m.metadata["parent_id"] for m in child_matches]))
+        
+        # Step 3: Fetch full parent context windows (1024 tokens each)
+        return [self.doc_store.get(pid) for pid in unique_parent_ids[:top_k]]
 ```
 
-**Why does it work?** Queries and documents have different "shapes" in semantic space: a query is an interrogative sentence, while a document is declarative. HyDE converts the query into a declarative form and reduces this "shape difference."
+### Agentic and Adaptive RAG
 
-Reference paper: [Precise Zero-Shot Dense Retrieval without Relevance Labels](https://arxiv.org/abs/2212.10496) (Gao et al. 2022)
-
-### Small-to-Big: Retrieve Small Chunks, Return Big Chunks
+Rather than executing a hardcoded retrieval pass for every interaction, **Agentic RAG** empowers the model to determine whether external retrieval is warranted, formulate multi-hop search queries, and evaluate retrieval sufficiency:
 
 ```python
-# Problem: small chunks retrieve precise matches, but do not contain enough context
-# Solution: use small chunks for retrieval, return big chunks
-
-class SmallToBigRetriever:
-    def __init__(self):
-        self.small_chunks = {}  # chunk_id -> small text (used for retrieval)
-        self.parent_chunks = {} # chunk_id -> parent_chunk_id (mapping)
-        self.big_chunks = {}    # parent_chunk_id -> big text (used for return)
-
-    def index(self, document: str):
-        # First split into big chunks (for example, 2000 tokens)
-        big_chunks = split_into_chunks(document, size=2000)
-        for big_id, big_text in enumerate(big_chunks):
-            self.big_chunks[big_id] = big_text
-
-            # Then split each big chunk into small chunks (for example, 200 tokens)
-            small_chunks = split_into_chunks(big_text, size=200)
-            for small_text in small_chunks:
-                small_id = len(self.small_chunks)
-                self.small_chunks[small_id] = small_text
-                self.parent_chunks[small_id] = big_id
-
-                # Only index the embedding of the small chunk
-                self.vector_store.add(get_embedding(small_text), small_id)
-
-    def search(self, query: str, top_k: int = 3) -> list[str]:
-        # Retrieve with small chunks
-        small_ids = self.vector_store.search(get_embedding(query), top_k=top_k)
-
-        # Return the corresponding big chunks (deduplicated)
-        parent_ids = list(set(self.parent_chunks[sid] for sid in small_ids))
-        return [self.big_chunks[pid] for pid in parent_ids]
-```
-
-### Agentic RAG: Letting the Model Decide Whether to Retrieve
-
-Traditional RAG retrieves every time. But some questions do not need retrieval ("1+1=?"), while others need multiple retrievals ("compare the financial health of company A and company B").
-
-```python
-def agentic_rag(question: str) -> str:
-    """The model decides for itself whether retrieval is needed"""
-    tools = [{
+# Adaptive RAG Tool Loop
+tools = [
+    {
         "type": "function",
         "function": {
-            "name": "search_knowledge_base",
-            "description": "Search for relevant information in the knowledge base. Use this when you need to look up specific facts, data, or document content.",
+            "name": "query_enterprise_knowledge_base",
+            "description": "Execute hybrid vector/lexical retrieval across internal engineering documentation.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query"}
+                    "search_query": {"type": "string", "description": "Optimized declarative search query."}
                 },
-                "required": ["query"]
+                "required": ["search_query"]
             }
         }
-    }]
-
-    messages = [
-        {"role": "system", "content": "You are an assistant. If you need to look up information, use the search_knowledge_base tool. If you already know the answer, answer directly."},
-        {"role": "user", "content": question}
-    ]
-
-    # Loop: the model may call tools multiple times
-    while True:
-        response = client.chat.completions.create(
-            model="gpt-4o", messages=messages, tools=tools
-        )
-
-        if response.choices[0].finish_reason == "stop":
-            return response.choices[0].message.content
-
-        # Execute tool calls
-        for tool_call in response.choices[0].message.tool_calls:
-            query = json.loads(tool_call.function.arguments)["query"]
-            results = search_knowledge_base(query)
-            messages.append(response.choices[0].message)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": json.dumps(results, ensure_ascii=False)
-            })
+    }
+]
 ```
 
----
+## 10.4 Supervised Fine-Tuning: Modulating Behavioral Manifolds, Not Memorizing Facts
 
-## 10.4 Fine-tuning in Depth
+### The Core Architectural Axiom
 
-### When You Should Fine-tune
+The most widespread anti-pattern in enterprise machine learning is attempting to teach foundation models new factual knowledge via fine-tuning:
 
-A key realization: **fine-tuning is for changing behavior, not injecting facts**.
+> **Fine-tuning modulates the behavioral manifold (syntax, tone, domain reasoning policies, output schemas); it is fundamentally unsuitable for parametric fact injection.**
 
+```mermaid
+flowchart LR
+    subgraph SFT_Optimal["Optimal Fine-Tuning Domain"]
+        O1["Enforcing Strict Domain Dialects<br/>(Medical terminology, legal schemas)"]
+        O2["Constraining Output Formats<br/>(Pydantic ASTs, Cypher queries)"]
+        O3["Internalizing Deductive Workflows<br/>(Complex triage policies)"]
+    end
+
+    subgraph SFT_Failure["Pathological Fine-Tuning Domain"]
+        F1["Injecting Dynamic Enterprise Facts<br/>(Product prices, policy docs)"]
+        F2["Memorizing Monolithic Knowledge Bases<br/>(Susceptible to hallucination & drift)"]
+        F3["Continuous Real-Time Knowledge Sync<br/>(Catastrophic forgetting)"]
+    end
+
+    style SFT_Optimal fill:#c8e6c9,stroke:#1b5e20
+    style SFT_Failure fill:#ffcdd2,stroke:#b71c1c
 ```
-✅ Scenarios suitable for fine-tuning:
-- Change output style (formal -> conversational, English -> Chinese medical terminology)
-- Change output format (free text -> specific JSON schema)
-- Learn domain-specific reasoning patterns (legal reasoning, medical diagnosis workflows)
-- Reduce refusals (let the model handle legitimate tasks that would otherwise be refused)
 
-❌ Scenarios unsuitable for fine-tuning:
-- Inject the latest facts (use RAG)
-- Remember the content of specific documents (use RAG or long context)
-- Give the model new "abilities" (fine-tuning can only adjust the expression of existing abilities)
-```
+Attempting to force an LLM to memorize exact entity relationships via gradient descent leads to catastrophic forgetting of pretraining priors and high factual hallucination rates when probed on tail distributions.
 
-### SFT (Supervised Fine-tuning)
+### Parameter-Efficient Fine-Tuning (PEFT): LoRA and QLoRA
 
-The most direct method is to prepare instruction-response pairs and let the model learn from them.
+Full-parameter fine-tuning ($\Delta \mathbf{W} \in \mathbb{R}^{d \times k}$) updates hundreds of billions of parameters, requiring massive multi-GPU clusters. **Low-Rank Adaptation (LoRA)** ([Hu et al., 2021](https://arxiv.org/abs/2106.09685)) constrains weight updates by factoring the delta matrix into two low-rank matrices:
+
+$$\mathbf{W}_{\text{adapted}} = \mathbf{W}_0 + \Delta \mathbf{W} = \mathbf{W}_0 + \frac{\alpha}{r} (\mathbf{B} \cdot \mathbf{A})$$
+
+where $\mathbf{W}_0 \in \mathbb{R}^{d \times k}$ remains frozen, $\mathbf{B} \in \mathbb{R}^{d \times r}$, $\mathbf{A} \in \mathbb{R}^{r \times k}$, and rank $r \ll \min(d, k)$ (typically $r \in \{8, 16, 32\}$).
 
 ```python
-# Use the OpenAI fine-tuning API
-from openai import OpenAI
-client = OpenAI()
-
-# 1. Prepare training data (JSONL format)
-# training_data.jsonl:
-# {"messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
-# {"messages": [...]}
-# ...
-
-# 2. Upload the training file
-file = client.files.create(
-    file=open("training_data.jsonl", "rb"),
-    purpose="fine-tune"
-)
-
-# 3. Create a fine-tuning job
-job = client.fine_tuning.jobs.create(
-    training_file=file.id,
-    model="gpt-4o-mini-2024-07-18",
-    hyperparameters={"n_epochs": 3}
-)
-
-# 4. Use the fine-tuned model
-response = client.chat.completions.create(
-    model=job.fine_tuned_model,  # ft:gpt-4o-mini:my-org:...
-    messages=[...]
-)
-```
-
-### LoRA / QLoRA: Parameter-Efficient Fine-tuning
-
-Full fine-tuning modifies all model parameters, which is very expensive. LoRA (Low-Rank Adaptation) modifies only a small subset of them.
-
-**Core idea**: Do not modify the weight matrix W directly. Instead, add a low-rank decomposition ΔW = BA, where B and A have much smaller dimensions than W.
-
-```python
-# Use Hugging Face PEFT + TRL for LoRA fine-tuning
+# Enterprise PEFT Implementation via Hugging Face PEFT + TRL
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
 from trl import SFTTrainer, SFTConfig
 
-# Load the base model
-model = AutoModelForCausalLM.from_pretrained(
+base_model = AutoModelForCausalLM.from_pretrained(
     "meta-llama/Llama-3.1-8B-Instruct",
     torch_dtype="auto",
     device_map="auto"
 )
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
 
-# Configure LoRA
 lora_config = LoraConfig(
-    r=16,                    # Rank (higher means more expressive, but also larger)
-    lora_alpha=32,           # Scaling factor
-    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],  # Which layers get LoRA
+    r=16,
+    lora_alpha=32,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     lora_dropout=0.05,
+    bias="none",
     task_type="CAUSAL_LM"
 )
 
-model = get_peft_model(model, lora_config)
-print(f"Trainable parameters: {model.print_trainable_parameters()}")
-# Typical output: trainable params: 13M || all params: 8B || trainable%: 0.16%
-
-# Training
-training_config = SFTConfig(
-    output_dir="./lora-output",
-    num_train_epochs=3,
-    per_device_train_batch_size=4,
-    learning_rate=2e-4,
-    logging_steps=10,
-)
-
-trainer = SFTTrainer(
-    model=model,
-    args=training_config,
-    train_dataset=dataset,
-    tokenizer=tokenizer,
-)
-
-trainer.train()
+peft_model = get_peft_model(base_model, lora_config)
+peft_model.print_trainable_parameters()
+# Trainable params: ~20M (0.25% of total 8B parameter footprint)
 ```
 
-**QLoRA** goes one step further: the base model is loaded with 4-bit quantization, and only the LoRA parameters are trained. A single 24 GB consumer GPU can fine-tune a 70B model.
-
-### Common Fine-tuning Mistakes
-
-1. **Too little data**: It is hard to get results with fewer than 100 examples. At least 500-1000 high-quality examples are recommended.
-2. **Poor data quality**: 100 high-quality examples > 10,000 low-quality examples. Every example should be "the ideal answer you want the model to output."
-3. **Overfitting**: Training loss is very low, but performance gets worse: the model has memorized the training data and lost generalization ability.
-4. **Wrong task definition**: Fine-tuning with the mindset of "teaching facts" (you should use RAG).
-5. **Wrong evaluation metric**: Looking only at loss instead of actual output quality.
+**QLoRA** ([Dettmers et al., 2023](https://arxiv.org/abs/2305.14314)) compresses $\mathbf{W}_0$ into 4-bit NormalFloat (NF4) with double quantization, enabling fine-tuning of 70B parameter checkpoints on a single workstation GPU without metric degradation.
 
 ---
 
-## 10.5 Long Context
+## 10.5 Ultra-Long Context Windows: Capabilities, Economics, and Attention Mechanics
 
-### Context Lengths of Modern Models
+Modern foundation models routinely support context windows ranging from 128K to 2M+ tokens (Google Gemini 1.5 Pro, Claude 3.7 Sonnet).
 
-| Model | Context length |
-|------|-----------|
-| GPT-4o | 128K tokens |
-| Claude Opus/Sonnet | 200K tokens |
-| Gemini 1.5 Pro | 2M tokens |
-| Llama 3.1 | 128K tokens |
+### The Perils of In-Context Knowledge Dumping
 
-128K tokens is roughly equivalent to a 300-page book. 2M tokens is roughly equivalent to 10 books.
+While ingesting an entire document repository directly into the context window eliminates retrieval pipelines, it introduces three major architectural bottlenecks:
 
-### The Temptations and Traps of Long Context
-
-**Temptation**: Put all documents directly into the prompt. No RAG pipeline, no chunking, no vector database. Simple!
-
-**Trap 1: Lost in the Middle**
-
-Research by [Liu et al. 2023](https://arxiv.org/abs/2307.03172) found that model performance drops significantly when relevant information appears in the **middle** of a long context. Models are better at using information near the beginning and the end.
-
-```
-Information position:  [Beginning] <- Good performance
-                       [Middle]    <- Poor performance  <- "Lost in the Middle"
-                       [End]       <- Good performance
+```mermaid
+graph TD
+    A["Ultra-Long Context Constraints"] --> B["Lost-in-the-Middle Phenomenon<br/>Attention weights concentrate at boundary extremes"]
+    A --> C["Inference Cost Explosion<br/>Billed linearly per token on every forward query"]
+    A --> D["Time-to-First-Token (TTFT) Latency<br/>KV cache computation scales with sequence length"]
 ```
 
-**Trap 2: Cost**
+1. **Lost in the Middle**:
+   Liu et al. ([2023](https://arxiv.org/abs/2307.03172)) demonstrated that attention mechanisms prioritize information located at the beginning ($x_1 \dots x_{500}$) and end ($x_{N-500} \dots x_N$) of context windows. Retrieval accuracy drops sharply when critical factual needles are situated within the central $20\%–80\%$ span of million-token prompts.
+2. **Economic Asymmetry**:
+   Passing 500,000 tokens on every conversational turn across thousands of concurrent users yields exponential API compute costs compared to targeted 1,000-token RAG injections.
 
-```python
-# Cost comparison
-# Suppose GPT-4o is used: $2.50 per 1M input tokens
+### When Long Context is the Optimal Strategy
 
-# RAG approach: pass only 3 relevant chunks (about 1,500 tokens)
-rag_cost_per_query = 1500 / 1_000_000 * 2.50  # $0.00375
-
-# Long-context approach: pass the whole document (100K tokens)
-long_context_cost_per_query = 100_000 / 1_000_000 * 2.50  # $0.25
-
-# Long context is 67 times more expensive
-```
-
-**Trap 3: Latency**
-
-Processing 100K tokens has much higher latency than processing 1K tokens. In interactive user scenarios, this difference is obvious.
-
-### When Long Context Is the Right Choice
-
-Despite these drawbacks, long context is optimal in some scenarios:
-
-- **The document set is small, and every query needs global understanding** (for example, analyzing all clauses in a contract)
-- **Rapid prototyping**: first validate feasibility with long context, then decide whether to invest in a RAG pipeline
-- **Strong dependencies across contexts**: RAG chunking would break these dependencies
+Long context is the superior choice when:
+- **Global Synthesis is Mandatory**: Generating a unified thematic audit across an entire codebase, legal deposition, or scientific book.
+- **Cross-Sectional Semantic Dependencies**: Situations where chunking would sever critical semantic coreferences and cross-clause conditions.
+- **Rapid Zero-Infrastructure Prototyping**: Validating prompt efficacy before investing in indexing infrastructure.
 
 ---
 
-## 10.6 Decision Framework
+## 10.6 The Enterprise Compound AI Decision Matrix
+
+Enterprise architectures rarely rely on a single knowledge injection path. Production systems deploy a **Compound AI Architecture** combining all three paradigms:
 
 ```mermaid
 flowchart TD
-    START[Need to inject knowledge] --> Q1{Does the knowledge<br/>change often?}
-    Q1 -->|Yes| RAG1[RAG]
-    Q1 -->|No| Q2{Need to change the model's<br/>behavior/style/format?}
-    Q2 -->|Yes| FT[Fine-tuning]
-    Q2 -->|No| Q3{Is the document volume large?}
-    Q3 -->|Small, < 100K tokens| LC[Long Context]
-    Q3 -->|Large| RAG2[RAG]
+    Req["Enterprise Knowledge Injection Requirement"] --> Q1{"Is the Target Knowledge Dynamic / Rapidly Mutating?"}
 
-    RAG1 --> Q4{Need the highest accuracy?}
-    RAG2 --> Q4
-    FT --> Q4
-    LC --> Q4
-    Q4 -->|Yes| COMBO["Use in combination<br/>RAG + Fine-tune + Long Context"]
+    Q1 -->|Yes| P1["Retrieval-Augmented Generation (RAG)<br/>Decouple knowledge in vector/graph indices"]
+    Q1 -->|No| Q2{"Requires Strict Stylistic Invariants / Specialized Token Syntax?"}
 
-    style RAG1 fill:#e3f2fd,stroke:#1565c0
-    style RAG2 fill:#e3f2fd,stroke:#1565c0
-    style FT fill:#fff3e0,stroke:#e65100
-    style LC fill:#e8f5e9,stroke:#2e7d32
-    style COMBO fill:#f3e5f5,stroke:#6a1b9a
+    Q2 -->|Yes| P2["Parameter Fine-Tuning (LoRA / SFT)<br/>Imprint behavioral policy in weights"]
+    Q2 -->|No| Q3{"Total Corpus Scope < 100K Tokens & Requires Global Audit?"}
+
+    Q3 -->|Yes| P3["Direct Ultra-Long Context Ingestion<br/>Zero infrastructure, high global fidelity"]
+    Q3 -->|No| P1
+
+    P1 --> Compound["Compound Production Pattern:<br/>Fine-Tuned Adapter (Style/Policy) + Hybrid RAG (Facts) + In-Context History"]
+    P2 --> Compound
+    P3 --> Compound
+
+    style P1 fill:#e3f2fd,stroke:#1565c0
+    style P2 fill:#fff3e0,stroke:#e65100
+    style P3 fill:#e8f5e9,stroke:#2e7d32
+    style Compound fill:#f3e5f5,stroke:#6a1b9a
 ```
 
-### Real-World Examples of Using Them Together
-
-Real-world systems often **combine all three**:
+### Production Workload Synergy
 
 ```
-Customer service system:
-- Fine-tuning: Make the model use the company's tone and terminology (behavior layer)
-- RAG: Retrieve the latest product documentation and FAQ (knowledge layer)
-- Long Context: Put the complete history of the current conversation into the prompt (session layer)
+Enterprise Medical Assistant Architecture:
+- Behavior Layer (Fine-Tuning): Imprints HIPAA compliance, clinical communication standards, and structured SOAP note formats into LoRA adapters.
+- Knowledge Layer (Hybrid RAG): Dynamically retrieves real-time clinical drug interaction databases, insurance formularies, and patient medical records.
+- Session Layer (Long Context): Maintains the full longitudinal conversational history and multi-visit clinical records in active working memory.
 ```
-
-```
-Code assistant:
-- Fine-tuning: Make the model familiar with the company's coding standards (behavior layer)
-- RAG: Retrieve relevant code files and documentation (knowledge layer)
-- Long Context: Put the current file and related files into the prompt (context layer)
-```
-
-### A Simple Decision Checklist
-
-Before choosing an approach, answer these questions:
-
-1. **Knowledge update frequency?** Daily -> RAG; monthly -> either can work; almost never changes -> fine-tune or long context
-2. **Need source citations?** Yes -> RAG (naturally supports citations)
-3. **Need to change model behavior?** Yes -> fine-tune
-4. **How large is the total document volume?** < 100K tokens -> long context; > 100K -> RAG
-5. **Latency requirements?** Strict -> fine-tune (no extra retrieval); loose -> RAG
-6. **Budget?** If passing the full document on every query is too expensive -> RAG
 
 ---
 
-## 10.7 Intuition for Embeddings
+## 10.7 Mathematical Foundations of Dense Embeddings and Contrastive Learning
 
-### Semantic Similarity = Close Vector Distance
+### Semantic Geometry: Vector Directionality over Magnitude
 
-Embeddings map text into a high-dimensional space. In this space, texts with similar meanings are close together, while unrelated texts are far apart.
+In dense representation space $\mathbb{R}^d$, semantic relationships are characterized by directional alignment rather than Euclidean distance. Normalized cosine similarity evaluates angular divergence independently of vector length:
 
-```
-Schematic in high-dimensional space (projected down to 2D):
+$$\cos(\theta) = \frac{\mathbf{q} \cdot \mathbf{d}}{\|\mathbf{q}\|_2 \|\mathbf{d}\|_2}$$
 
-        "Python programming"  •
-                              • "Python tutorial"
-     "Java programming" •
-                    • "Introduction to programming"
+### Contrastive Optimization: The InfoNCE Objective
 
-                                    • "Today's weather"
-                                  • "Tomorrow's temperature"
-```
+Dense embedding networks are optimized via **contrastive multi-negative loss** (InfoNCE):
 
-### Contrastive Learning: Push Close, Pull Apart
+$$\mathcal{L}_{\text{InfoNCE}} = -\log \frac{\exp\left(\frac{\text{sim}(\mathbf{q}, \mathbf{d}^+)}{\tau}\right)}{\exp\left(\frac{\text{sim}(\mathbf{q}, \mathbf{d}^+)}{\tau}\right) + \sum_{j=1}^{K} \exp\left(\frac{\text{sim}(\mathbf{q}, \mathbf{d}_j^-)}{\tau}\right)}$$
 
-Embedding models are usually trained with **contrastive learning**:
+where $\mathbf{d}^+$ denotes the ground-truth relevant passage, $\{\mathbf{d}_j^-\}_{j=1}^K$ represents in-batch hard negative distractors, and $\tau$ denotes the softmax temperature parameter. 
 
-```
-Training signal:
-- (query, positive_doc) -> push closer (reduce distance)
-- (query, negative_doc) -> pull apart (increase distance)
-
-For example:
-- ("How to learn Python", "Python beginner tutorial") -> push closer
-- ("How to learn Python", "Today's stock market")     -> pull apart
-```
-
-Mathematically, the commonly used loss function is InfoNCE:
-
-$$\mathcal{L} = -\log \frac{\exp(\text{sim}(q, d^+) / \tau)}{\sum_{i} \exp(\text{sim}(q, d_i) / \tau)}$$
-
-where $\tau$ is the temperature parameter, $d^+$ is the positive sample, and $d_i$ includes the positive sample and all negative samples.
-
-### Why Cosine Similarity Works
-
-Cosine similarity measures whether the directions of two vectors are aligned, ignoring length:
-
-$$\cos(\theta) = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{a}| \cdot |\mathbf{b}|}$$
-
-Why is direction more important than length? Because embeddings encode **semantic direction**. If a long text and a short text are talking about the same thing, their vector directions should align, even though their lengths (magnitudes) may differ.
-
-### Choosing an Embedding Model
-
-The [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) is a useful reference for choosing embedding models. But note:
-
-1. **Domain match**: First place on a general benchmark is not necessarily the best fit for your domain. Vertical domains such as medicine, law, and code may need specialized embedding models.
-2. **Dimension and speed**: Higher-dimensional vectors are more expressive, but storage and search costs are higher. 768 dimensions is usually a good balance.
-3. **Multilingual support**: If your data is in Chinese, make sure the selected model performs well on Chinese (BAAI/bge series, Cohere multilingual).
-4. **Do you need to train your own?** In most cases, off-the-shelf models are enough. Only consider training your own embedding model when your domain terminology is extremely specialized (such as semiconductor manufacturing terminology).
+The optimization forces semantically related query-document pairs into high-density topological clusters while repelling dissimilar textual representations across the high-dimensional hypersphere.
 
 ---
 
@@ -756,45 +417,32 @@ The [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) is a usef
 
 ```mermaid
 graph TB
-    A["Knowledge injection"] --> B["RAG<br/>Runtime retrieval<br/>Open-book exam"]
-    A --> C["Fine-tuning<br/>Written into weights<br/>Studying for months"]
-    A --> D["Long Context<br/>Placed into prompt<br/>Last-minute cramming"]
-
-    B --> E["Pipeline: embed→index→retrieve→generate"]
-    B --> F["Optimization: query expansion, HyDE, reranker"]
-
-    C --> G["Changes behavior, not knowledge"]
-    C --> H["LoRA/QLoRA: parameter-efficient"]
-
-    D --> I["Simple but expensive"]
-    D --> J["Lost in the Middle"]
-
-    K["Decision"] --> L["Frequent updates → RAG"]
-    K --> M["Change behavior → Fine-tune"]
-    K --> N["Small document set → Long Context"]
-    K --> O["High accuracy → Use in combination"]
+    A["Knowledge Injection Paradigms"] --> B["RAG: Decoupled Runtime Grounding<br/>Hybrid search + Neural reranking + Citation whitelist"]
+    A --> C["Fine-Tuning: Behavioral Imprinting<br/>LoRA/QLoRA modulates policy, not facts"]
+    A --> D["Long Context: Global In-Memory Synthesis<br/>Best for cross-clause audits, bound by latency/cost"]
+    A --> E["Compound AI Architecture<br/>Synergistic combination across all three layers"]
 ```
 
 Core takeaways:
 
-1. **The three approaches are fundamentally different**: RAG is retrieval, fine-tuning is training, and long context is filling the prompt
-2. **RAG is the most general choice**: supports updates, supports citations, and has controllable cost
-3. **Fine-tuning changes behavior; it does not inject facts**: this is the most common misuse
-4. **Long context is simple but costly**: high cost, lost-in-the-middle failures, and high latency
-5. **Chunking is RAG's hidden bottleneck**: it is worth spending serious time on your chunking strategy
-6. **Hybrid search > pure vector search**: BM25 + vectors + reranker is the current best practice
-7. **Real-world systems often combine all three**: it is not an either-or choice
+1. **Decouple facts from behavior**: Use RAG for dynamic enterprise knowledge; use Fine-Tuning for specialized domain dialects, policies, and schemas.
+2. **Chunking dictates retrieval bounds**: Optimize chunk boundaries around structural markdown headers and semantic paragraph units ($384–512$ tokens with overlap).
+3. **Deploy hybrid search with reranking**: Fuse dense ANN retrieval (HNSW) with sparse lexical search (BM25) via Reciprocal Rank Fusion, followed by a cross-encoder neural reranker.
+4. **LoRA enables parameter efficiency**: Freeze foundational base weights and train rank-$r$ residual matrices $\Delta \mathbf{W} = \mathbf{B} \cdot \mathbf{A}$.
+5. **Beware of long-context traps**: Account for Lost-in-the-Middle attention dilution and inference cost scaling before discarding retrieval infrastructure.
+
+In Chapter 11, we elevate these static grounding techniques into autonomous systems: the architecture, planning loops, and tool ecosystems of AI Agents.
 
 ---
 
 ## Further Reading
 
-- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) — Lewis et al. 2020, the original RAG paper
-- [Lost in the Middle](https://arxiv.org/abs/2307.03172) — Liu et al. 2023
-- [Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)](https://arxiv.org/abs/2212.10496) — Gao et al. 2022
-- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) — Hu et al. 2021
-- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314) — Dettmers et al. 2023
-- [MTEB: Massive Text Embedding Benchmark](https://arxiv.org/abs/2210.07316) — Muennighoff et al. 2022
-- [FAISS](https://github.com/facebookresearch/faiss) — Facebook's vector search library
-- [LangChain RAG Tutorial](https://python.langchain.com/docs/tutorials/rag/)
-- [Hugging Face TRL](https://github.com/huggingface/trl) — A toolkit for training language models
+- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) — Lewis et al., Meta AI, 2020
+- [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172) — Liu et al., Stanford University, 2023
+- [Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)](https://arxiv.org/abs/2212.10496) — Gao et al., 2022
+- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) — Hu et al., Microsoft Research, 2021
+- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314) — Dettmers et al., University of Washington, 2023
+- [MTEB: Massive Text Embedding Benchmark](https://arxiv.org/abs/2210.07316) — Muennighoff et al., 2022
+- [Hugging Face TRL: Transformer Reinforcement Learning](https://github.com/huggingface/trl)
+
+[← Previous Chapter](09-prompting.md) | [Table of Contents](../README.md) | [Next Chapter →](11-agents.md)

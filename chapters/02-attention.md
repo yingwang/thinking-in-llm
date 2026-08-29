@@ -5,31 +5,31 @@
 # 第二章：Attention 是信息路由
 
 > "Attention is all you need."
-> — Vaswani et al., 2017
+> (Vaswani et al., 2017)
 
-"注意力"这个名字是有误导性的。当我们说"注意力机制"时，你可能联想到人类集中注意力的样子——聚焦某件事，忽略其他。但 Transformer 中的 attention 更像是一个**信息路由网络**：每个 token 都在问"我需要从哪里获取信息？"，然后从整个序列中**按需读取**。
+"注意力"在命名上带有直观的拟人色彩，容易让人联想到人类意识在特定焦点上的聚焦与筛选。然而在 Transformer 的数学图景中，Attention 的实质是一个**动态信息路由网络**：序列中的每个 token 主动发起寻址查询，评估与上下文中所有位置的关联强度，进而**按需聚合**全局信息。
 
-理解 attention，就理解了 Transformer 的核心——也就理解了现代 LLM 的"大脑结构"。
+洞悉了 Attention 的路由本质，便把握了 Transformer 架构的核心中枢，也构筑了理解现代大语言模型内部计算流的坚实基石。
 
 ---
 
 ## 2.1 Attention 解决了什么问题
 
-### RNN 的瓶颈：万事皆经一隘口
+### RNN 的瓶颈：串行递推与信息隘口
 
-在 Transformer 之前，序列建模的主力是 RNN（循环神经网络）。RNN 的工作方式类似流水线：
+在 Transformer 问世之前，序列建模的核心范式是循环神经网络（RNN）。RNN 采取逐步推进的链式传递机制：
 
 ```
 token_1 → [h₁] → token_2 → [h₂] → token_3 → [h₃] → ... → token_n → [hₙ]
 ```
 
-所有历史信息都被压缩进一个固定大小的隐藏向量 $h$。要从 token_1 传递信息到 token_1000，这个信息必须经过 999 个压缩步骤。想象一下：你要通过 999 个人玩传话游戏，传到最后还能保留多少原始信息？
+所有前序历史必须被强制压缩至固定维度的隐藏状态向量 $h$ 中。若要将 token_1 的信息传递至 token_1000，该信号必须历经 999 次非线性压缩与矩阵相乘。这一串行递推结构不可避免地导致梯度消失与信息衰减，如同多轮转述的传话实验，末端状态难以无损保留长程前序特征。
 
-这就是著名的**长距离依赖问题**。LSTM 和 GRU 缓解了这个问题，但没有根本解决。
+即便 LSTM 与 GRU 引入了门控机制，亦仅能缓解而无法从根本上消除**长程依赖瓶颈**。此外，时间维度的强串行依赖从底层锁死了大规模硬件的并行加速潜力。
 
-### Attention：每个位置直接访问所有位置
+### Attention：全连接的信息直连图谱
 
-Attention 的解决方案很暴力也很优雅：**让每个 token 直接和所有其他 token 通信**。
+Attention 机制从几何拓扑上重塑了信息交互路径：**使序列中任意两个 token 之间建立 $O(1)$ 距离的直接通信通道**。
 
 ```mermaid
 graph LR
@@ -47,29 +47,29 @@ graph LR
     end
 ```
 
-Token_1000 想知道 token_1 说了什么？直接去读，不需要经过中间 998 个人。
+在全连接注意力图谱中，token_1000 无需穿越中间层层递推，即可直接寻址并提取 token_1 的表征。
 
-代价是 **O(n²)** 的计算复杂度——n 个 token，每对之间都要计算一次注意力权重。这就是为什么上下文窗口不能无限大：处理 100K token 的文本需要计算 100K × 100K = 100 亿次注意力得分。
+这一全局直连的代价，是随序列长度呈平方级增长的计算复杂度：**$O(n^2)$**。在包含 $n$ 个 token 的序列中，任意位置对之间均需计算注意力权重。处理长达 100K token 的文本，单层自注意力便涉及 $10^5 \times 10^5 = 100$ 亿次点积运算。这构成了上下文窗口无法无限扩充的物理硬约束。
 
 ---
 
-## 2.2 QKV：查询-匹配-读取
+## 2.2 QKV：查询、匹配与加权聚合
 
-Attention 机制的核心是三个投影矩阵产生的三个向量：**Query (Q)、Key (K)、Value (V)**。
+自注意力机制的计算核心，是由三个线性投影矩阵生成的三组高维向量：**Query (Q)、Key (K)、Value (V)**。
 
-### 直觉：数据库查询
+### 直觉：可微分的软寻址数据库
 
-最好的类比是数据库查询：
+理解 QKV 的最佳视角是参数化的数据库查询系统：
 
 ```sql
 SELECT value FROM memory WHERE key MATCHES query
 ```
 
-- **Q (Query)**：我在找什么信息？
-- **K (Key)**：我这里有什么信息可以提供？
-- **V (Value)**：如果你需要我的信息，这是具体内容。
+- **Q (Query)**：当前 token 正在检索何种语义特征；
+- **K (Key)**：当前 token 能够向外暴露的索引特征；
+- **V (Value)**：当匹配成功时，当前 token 实际向外输出的表征内容。
 
-每个 token 同时扮演三个角色：它用自己的 Q 去查询别人，用自己的 K 被别人查询，用自己的 V 提供信息给匹配到它的人。
+在每一层自注意力中，每个 token 同时承载三重角色：以自身 Q 去检索全局，以自身 K 响应其他位置的查询，以自身 V 向匹配方输送信息载荷。
 
 ### 计算过程
 
@@ -85,7 +85,7 @@ def attention(Q, K, V, mask=None):
     
     # Step 1: 计算注意力得分（Q 和 K 的点积）
     scores = torch.matmul(Q, K.transpose(-2, -1)) / (d_k ** 0.5)
-    # scores: [batch, seq_len, seq_len] — 每对 token 之间的"相关度"
+    # scores: [batch, seq_len, seq_len]，表示每对 token 之间的相关度
     
     # Step 2: 因果掩码（对于 decoder，不能看到未来）
     if mask is not None:
@@ -93,7 +93,7 @@ def attention(Q, K, V, mask=None):
     
     # Step 3: Softmax 归一化 → 注意力权重
     weights = F.softmax(scores, dim=-1)
-    # weights: [batch, seq_len, seq_len] — 每行加起来为 1
+    # weights: [batch, seq_len, seq_len]，每行求和为 1
     
     # Step 4: 用权重加权求和 V
     output = torch.matmul(weights, V)
@@ -102,37 +102,37 @@ def attention(Q, K, V, mask=None):
     return output, weights
 ```
 
-让我们拆解每一步：
+让我们拆解这四个关键计算阶段：
 
-**Step 1：计算"匹配度"**
+**第一阶段：点积相似度与尺度缩放**
 
-Q 和 K 的点积衡量两个 token 之间的"相关度"。点积越大，说明 Q 在找的东西和 K 能提供的越匹配。
+向量 $Q$ 与 $K$ 的点积量化了两者的几何共线性。点积越大，表明查询需求与索引标识高度契合。
 
-为什么要除以 $\sqrt{d_k}$？防止点积值太大，导致 softmax 输出接近 one-hot（梯度消失）。这就是所谓的 **Scaled Dot-Product Attention**。
+为何除以 $\sqrt{d_k}$？当隐层维度 $d_k$ 较大时，向量点积的方差会随着维度增加而线性增大，导致点积结果落在 Softmax 函数的饱和区，引发梯度弥散。缩放因子 $\frac{1}{\sqrt{d_k}}$ 能够将方差稳定在单位尺度，这正是 **Scaled Dot-Product Attention** 的核心设计。
 
-**Step 2：因果掩码**
+**第二阶段：因果掩码（Causal Mask）**
 
-在语言模型（decoder）中，token 不能看到未来的 token——否则就是作弊。因果掩码是一个下三角矩阵：
+在自回归解码器中，模型生成当前位置时严禁捕获未来时刻的信息。因果掩码构建了一个严格的下三角矩阵：
 
 ```
      t₁  t₂  t₃  t₄
-t₁ [  1   0   0   0 ]    t₁ 只能看到自己
-t₂ [  1   1   0   0 ]    t₂ 能看到 t₁ 和自己
-t₃ [  1   1   1   0 ]    t₃ 能看到 t₁, t₂, 自己
-t₄ [  1   1   1   1 ]    t₄ 能看到所有
+t₁ [  1   0   0   0 ]    t₁ 仅可寻址自身
+t₂ [  1   1   0   0 ]    t₂ 可寻址 t₁ 与自身
+t₃ [  1   1   1   0 ]    t₃ 可寻址 t₁, t₂ 与自身
+t₄ [  1   1   1   1 ]    t₄ 可寻址全局历史
 ```
 
-被掩码的位置设为 $-\infty$，softmax 后变成 0。
+被掩码阻断的位置被赋予 $-\infty$，经由 Softmax 映射后权重精确归零。
 
-**Step 3：Softmax → 注意力权重**
+**第三阶段：Softmax 概率归一化**
 
-Softmax 把匹配度得分变成概率分布。每个 token 把 100% 的"注意力预算"分配给序列中的各个位置。
+Softmax 操作将未经校准的相关度得分转换为严格的概率分布。每个 token 拥有 100% 的权重预算，按匹配程度动态分配给序列中的各个历史位置。
 
-**Step 4：加权读取**
+**第四阶段：Value 向量的加权汇聚**
 
-用注意力权重对 V 做加权求和。如果 token_5 对 token_2 的注意力权重是 0.7，对 token_1 是 0.2，那么 token_5 的输出有 70% 来自 token_2 的信息，20% 来自 token_1。
+利用归一化后的注意力权重对 $V$ 矩阵实施线性加权求和。若 token_5 对 token_2 的注意力权重为 0.7，对 token_1 为 0.2，则 token_5 聚合后的输出向量中将包含 70% 的 token_2 信息与 20% 的 token_1 信息。
 
-### 完整的自注意力流程
+### 完整的自注意力数据流
 
 ```mermaid
 graph TB
@@ -151,13 +151,13 @@ graph TB
     MUL --> OUT["输出"]
 ```
 
-关键洞察：**Q、K、V 都是通过可学习的线性变换从同一个输入 X 得来的**。模型通过学习 $W_Q$、$W_K$、$W_V$ 这三个权重矩阵，来决定"什么信息值得查询"、"什么信息值得被索引"、"什么信息值得被传递"。
+关键洞察：**Q、K、V 均是由同一输入表征 $X$ 经由不同的可学习线性投影衍生而来**。模型通过持续优化参数矩阵 $W_Q$、$W_K$ 与 $W_V$，自主学习在不同任务模式下"应检索何种特征"、"应暴露何种索引"以及"应传递何种信息载荷"。
 
 ---
 
-## 2.3 Multi-Head Attention：多双眼睛
+## 2.3 Multi-Head Attention：多子空间并行路由
 
-一组 QKV 只能捕捉一种"关系模式"。Multi-head attention 的思想是：**用多组 QKV 并行工作，每组捕捉不同类型的关系**。
+单一组 QKV 投影只能在特定的高维方向上构建一种关联拓扑。Multi-Head Attention（多头注意力）的核心思想在于：**将表征切分至多个低维正交子空间中并行执行注意力路由，使得模型能够同时捕获多种异构关系**。
 
 ```python
 class MultiHeadAttention(torch.nn.Module):
@@ -191,126 +191,124 @@ class MultiHeadAttention(torch.nn.Module):
         return self.W_o(out)
 ```
 
-### 不同的头看到什么？
+### 多头关注的语义模式分化
 
-研究发现（[Clark et al. 2019](https://arxiv.org/abs/1906.04341)），不同的 attention head 确实学会了关注不同类型的关系：
+机制可解释性研究（Clark et al., 2019）表明，在充分训练的网络中，不同的注意力头展现出高度分工的功能特化：
 
-- **句法头**：关注主谓一致（"The dogs **are** running" 中，"are" 强烈 attend to "dogs"）
-- **位置头**：关注相邻 token（前一个词、后一个词）
-- **语义头**：关注同义词或相关概念
-- **分隔符头**：关注标点符号和句子边界
-- **稀有模式头**：关注不常见的搭配
+- **句法头（Syntactic Heads）**：专精于主谓一致等句法依赖（例如在 "The dogs **are** running" 中，"are" 强力指向 "dogs"）；
+- **位置邻域头（Positional Heads）**：高度聚焦于相邻位置，构建局部上下文滑动窗口；
+- **指代消解头（Coreference Heads）**：跨越长距离将代词锚定至其先行词；
+- **标点与边界头（Delimiter Heads）**：紧密跟踪句号、换行符等宏观段落边界；
+- **模式匹配头（Pattern Matching Heads）**：搜寻序列中重复出现的结构化搭配。
 
-这就像一个阅读理解小组：每个成员用不同的视角读同一篇文章，然后综合所有人的发现。
+### 复杂语义的并行解析
 
-### 类比
-
-想象你在读一个复杂的句子：
+考察以下含有歧义与长程指代的复杂句子：
 
 > "The trophy doesn't fit in the brown suitcase because **it** is too big."
 
-理解这句话需要同时追踪多种关系：
-- **指代关系**："it" 指什么？（head 1 负责）
-- **因果关系**："because" 连接了什么和什么？（head 2 负责）
-- **物理属性**："too big" 描述什么的大小？（head 3 负责）
-- **句法结构**：主语是什么？谓语是什么？（head 4 负责）
+要正确解析该句的物理因果，模型必须在同一时刻解耦并追踪多重维度：
+- **代词指代**："it" 指向 "trophy" 还是 "suitcase"？（由指代头判定）；
+- **逻辑因果**："because" 连接的前后从句结构（由逻辑关系头维持）；
+- **物理量纲**："too big" 描述的空间属性对应（由实体属性头关联）；
+- **句法骨架**：谓语动词与宾语的支配关系（由句法解析头构建）。
 
-Multi-head attention 让模型同时在多个维度上路由信息。
+多头注意力机制通过正交子空间的并行投影，让单层网络能够在多个语义流形上同时完成信息路由与重组。
 
 ---
 
-## 2.4 Induction Heads：模型学到的第一个"算法"
+## 2.4 Induction Heads：上下文学习的最小算法回路
 
 ### 什么是 Induction Head？
 
-[Olsson et al. 2022](https://arxiv.org/abs/2209.11895) 发现了一种叫 **induction head** 的注意力模式，可能是 Transformer 学到的最基础的"算法"。
+Olsson 等人在 2022 年的研究中发现了一种名为 **Induction Head（归纳头）** 的特殊注意力回路。这被认为是 Transformer 在无监督预训练中自发演化出的最基础"算法回路"。
 
-Induction head 做的事情很简单：
+归纳头执行的操作在逻辑上十分清晰：
 
-> 如果之前出现过 `[A][B]`，当再次出现 `[A]` 时，预测 `[B]`。
+> 若在前序上下文中曾出现过模式 `[A][B]`，当序列再度出现 `[A]` 时，模型倾向于预测紧随其后的 token 为 `[B]`。
 
 ```
-文本: "Harry Potter is a wizard. Harry Potter is a"
+文本上下文: "Harry Potter is a wizard. Harry Potter is a"
                                                  ^
-                                    模型在这里预测下一个 token
+                                    模型在此位置预测下一个 token
                                     
-Induction head 的工作：
-  1. 看到当前 token 是 "a"
-  2. 搜索之前出现过 "a" 的位置
-  3. 找到 "...is a wizard..."
-  4. 读取 "a" 后面的 token → "wizard"
-  5. 预测下一个 token 是 "wizard"
+归纳头回路的协同机制：
+  1. 感知当前活跃 token 为 "a"；
+  2. 沿历史注意力图谱检索先前出现过 "a" 的上下文节点；
+  3. 定位至前文 "...is a wizard..." 片段；
+  4. 提取该节点紧邻的后置 token 内容："wizard"；
+  5. 显著提升下一个预测 token 为 "wizard" 的似然概率。
 ```
 
-### 为什么这很重要？
+### 上下文学习（In-Context Learning）的物理基石
 
-Induction head 是 **in-context learning** 的最基本形式。它解释了为什么 few-shot prompting 有效：
+Induction Head 是 Few-shot Prompting 生效的底层微观机制。它赋予了模型在不调整权重的前提下、仅依赖上下文样例完成模式迁移的能力：
 
 ```
-输入:
+输入样例:
   "cat → 猫
    dog → 狗
    bird → "
 
-模型通过 induction head 识别模式：
-  英文 → 中文
-  英文 → 中文
-  英文 → ?
+模型借助 Induction Head 激活模式匹配：
+  英文标识符 → 中文映射
+  英文标识符 → 中文映射
+  英文标识符 → [触发归纳复制]
   
-预测: "鸟"
+生成输出: "鸟"
 ```
 
-模型不是在"理解"翻译任务，而是在做**模式匹配和补全**。但这个模式匹配足够强大，能处理非常复杂的 few-shot 任务。
+此时模型并非调用显式的符号翻译字典，而是在注意力回路中完成了**模式匹配、上下文寻址与条件补全**。
 
-### 两层合作
+### 双层注意力回路的级联协作
 
-Induction head 实际上需要两个 attention head 的合作：
+一个完整的 Induction Head 无法在单层注意力内闭环，它需要两层注意力机制在残差流中协同运算：
 
 ```mermaid
 graph TB
-    subgraph "Head 1: Previous Token Head"
-        A["当前 token: A"] -->|"注意"| B["前一个 token 的位置"]
-        B -->|"复制位置信息到残差流"| C["残差流"]
+    subgraph "第一层: Previous Token Head"
+        A["当前 token: A"] -->|"寻址"| B["前序 token 位置"]
+        B -->|"将位置信息写入残差流"| C["残差流 (Residual Stream)"]
     end
     
-    subgraph "Head 2: Induction Head"
-        C -->|"Q 编码: 寻找 A 后面的 token"| D["搜索所有位置"]
-        D -->|"找到之前 A 后面的 B"| E["读取 B 的信息"]
-        E -->|"输出"| F["预测 B"]
+    subgraph "第二层: Induction Head"
+        C -->|"Q 编码: 搜寻紧跟 A 之后的符号"| D["全局历史键匹配"]
+        D -->|"捕获前文 A 之后的 B"| E["提取 B 的 Value 载荷"]
+        E -->|"输出至预测分布"| F["输出高概率 token: B"]
     end
 ```
 
-1. **第一层**：一个"previous token head"学习把"前一个 token 是什么"的信息写入残差流
-2. **第二层**：induction head 利用这个信息，找到之前同样模式出现的位置，读取后面的 token
+1. **第 1 层（前序位置头）**：学习将"前一个 token 的标识与位置"编码写入共享的残差流；
+2. **第 2 层（归纳头）**：读取残差流中的前序信息构造 Query，在全局历史中精准匹配相同的 Key，进而提取其后继 token 的 Value 向量。
 
-这是 Transformer 中**跨层信息传递**的一个美丽例子。
+这是神经网络在自回归训练中，通过多层交互自发构建复杂逻辑算法的典型例证。
 
 ---
 
-## 2.5 位置编码：给 token 排座次
+## 2.5 位置编码：为置换不变性引入几何序
 
-### Transformer 没有位置概念
+### Transformer 的排列不变性挑战
 
-Attention 的计算是**排列不变的**（permutation invariant）。如果你把输入 token 的顺序打乱，attention 的输出只是相应打乱，但权重计算本身不变。
+纯粹的自注意力计算具有天然的**置换不变性**（Permutation Invariance）。若将输入序列中 token 的排列顺序随机打乱，注意力权重的计算结果仅发生相应的空间置换，其相对数值关系未发生实质改变。
 
-这意味着没有位置编码的 Transformer 无法区分：
-- "猫吃鱼" 和 "鱼吃猫"
+这意味着，脱离位置信息的 Transformer 将完全无法区分：
+- "猫 吃 鱼" 与 "鱼 吃 猫"
 
-因为两者包含完全相同的 token 集合。
+因为两者的嵌入集合完全重合。
 
-### RoPE：用旋转编码位置
+### RoPE：基于复数旋转的相对位置编码
 
-目前最主流的位置编码方案是 **Rotary Position Embedding (RoPE)**（[Su et al. 2021](https://arxiv.org/abs/2104.09864)）。
+目前主流的大语言模型普遍采用 **Rotary Position Embedding (RoPE)**（Su et al., 2021）。
 
-核心思想：把位置信息编码为向量的**旋转角度**。两个 token 的位置差越大，它们的 Q 和 K 向量之间的"旋转角度差"越大。
+RoPE 的核心洞见在于：**将 token 的绝对位置信息编码为高维向量在复数子空间中的旋转角度**。计算两个 token 之间的注意力得分时，向量点积自然消解绝对坐标，使得注意力强度仅取决于两者的**相对距离**。
 
 ```python
 import torch
 
 def apply_rope(x, positions, d_model):
     """
-    x: [batch, seq_len, d_model] — Q 或 K 向量
-    positions: [seq_len] — 位置索引
+    x: [batch, seq_len, d_model], Q 或 K 向量
+    positions: [seq_len], 位置索引
     """
     # 频率：不同维度用不同频率
     freqs = 1.0 / (10000 ** (torch.arange(0, d_model, 2).float() / d_model))
@@ -336,14 +334,14 @@ def apply_rope(x, positions, d_model):
     return x_rotated.flatten(-2)
 ```
 
-RoPE 的优雅之处：
-- 两个位置的注意力得分只取决于它们的**相对距离**，不取决于绝对位置
-- 理论上可以外推到更长的序列（虽然实际效果会衰减）
-- 计算高效，不需要额外的可学习参数
+RoPE 的结构优势体现在三个维度：
+- 相对距离敏感：点积衰减特性与自然语言的距离相关性保持高度自洽；
+- 零额外参数：完全基于确定性正余弦变换，无需额外可学习参数；
+- 外推友好：在长上下文扩展算法中具备优良的连续插值空间。
 
-### 上下文窗口：注意力的硬限制
+### 上下文窗口：注意力的物理边界
 
-每个模型都有一个上下文窗口（context window）——它能同时"看到"的最大 token 数。
+上下文窗口（Context Window）定义了单次前向传播中模型能够同时维系注意力计算的最大序列长度。
 
 ```
 GPT-4o:      128K tokens
@@ -351,32 +349,32 @@ Claude 3.5:  200K tokens
 Gemini 1.5:  1M-2M tokens
 ```
 
-上下文窗口受限于：
-1. **计算复杂度**：O(n²) 的 attention 计算
-2. **内存**：KV cache 随序列长度线性增长
-3. **位置编码泛化**：超过训练长度，位置编码可能失效
+上下文窗口的扩展受制于三道严密防线：
+1. **计算复杂度**：$O(n^2)$ 注意力在长序列下的浮点开销；
+2. **显存容量**：KV Cache 随序列长度与批次规模线性膨胀；
+3. **位置流形衰减**：超出预训练最大距离后，位置编码的内积外推稳定性面临退化。
 
-超过上下文窗口的文本对模型来说就是**不存在的**。这是一个硬限制，不是软限制。
+超越上下文窗口边界的信息在模型的前向传播中完全不可见，构成了物理意义上的绝对盲区。
 
 ---
 
-## 2.6 KV Cache：为什么推理不重复计算
+## 2.6 KV Cache：自回归推理的时空权衡
 
-### 问题：自回归生成的计算浪费
+### 自回归生成的计算冗余
 
-回顾自回归生成：
+回顾自回归逐步生成的计算模式：
 
 ```
-Step 1: 输入 [A, B, C]     → 预测 D
-Step 2: 输入 [A, B, C, D]   → 预测 E
-Step 3: 输入 [A, B, C, D, E] → 预测 F
+Step 1: 输入 [A, B, C]       → 预测 D
+Step 2: 输入 [A, B, C, D]     → 预测 E
+Step 3: 输入 [A, B, C, D, E]   → 预测 F
 ```
 
-在 Step 2 中，A、B、C 已经在 Step 1 处理过了。如果每次都重新计算，大量计算被浪费。
+在朴素的前向传播中，Step 2 处理 [A, B, C, D] 时会对前序 token [A, B, C] 重新执行全部 QKV 矩阵乘法。由于因果掩码的存在，前序 token 的 Key 和 Value 向量在后续时间步完全保持不变，重新计算带来了极大的算力浪费。
 
-### KV Cache：缓存已计算的 K 和 V
+### KV Cache：以内存换时延的核心优化
 
-关键观察：在自回归生成中，**之前 token 的 K 和 V 不会变**（因为因果掩码保证它们看不到未来 token）。所以我们可以缓存它们：
+核心优化准则：**在自回归生成阶段，缓存历史所有 token 的 Key 与 Value 张量，每次迭代仅需计算最新生成的单个 token 的 QKV 向量**。
 
 ```python
 class CachedAttention:
@@ -409,62 +407,61 @@ class CachedAttention:
 
 ```mermaid
 graph LR
-    subgraph "Without KV Cache"
-        A1["Step 1: compute K,V for [A,B,C]"]
-        A2["Step 2: compute K,V for [A,B,C,D] — 重复!"]
-        A3["Step 3: compute K,V for [A,B,C,D,E] — 更多重复!"]
+    subgraph "无 KV Cache (全序列重复计算)"
+        A1["Step 1: 计算 [A,B,C] 的 K,V"]
+        A2["Step 2: 重新计算 [A,B,C,D] 的 K,V"]
+        A3["Step 3: 重新计算 [A,B,C,D,E] 的 K,V"]
     end
     
-    subgraph "With KV Cache"
-        B1["Step 1: compute & cache K,V for [A,B,C]"]
-        B2["Step 2: compute K,V for [D] only, append to cache"]
-        B3["Step 3: compute K,V for [E] only, append to cache"]
+    subgraph "引入 KV Cache (增量更新)"
+        B1["Step 1: 计算并缓存 [A,B,C] 的 K,V"]
+        B2["Step 2: 仅计算 [D] 的 K,V 并追加至缓存"]
+        B3["Step 3: 仅计算 [E] 的 K,V 并追加至缓存"]
     end
 ```
 
-### 内存代价
+### 显存占用的量化分析
 
-KV cache 把计算换成了内存。对于一个典型的 70B 模型：
+KV Cache 将推理阶段的计算密集型瓶颈转换为了**显存容量与内存带宽瓶颈**。对于一个标准的 70B 密集模型（以 FP16 精度为例）：
 
 ```
-每层每个 token 的 KV cache 大小:
-  = 2 (K和V) × n_heads × d_head × sizeof(float16)
+单个 token 在单层网络中的 KV Cache 尺寸:
+  = 2 (K与V) × n_heads × d_head × sizeof(float16)
   = 2 × 64 × 128 × 2 bytes
-  = 32 KB per layer per token
+  = 32 KB / layer / token
 
-80 层 × 32 KB = 2.5 MB per token
+在 80 层 Transformer 网络中：
+  80 层 × 32 KB = 2.56 MB / token
 
-对于 128K context：
-  128,000 × 2.5 MB = 320 GB — 比模型本身还大！
+在 128K 超长上下文单并发请求下：
+  128,000 × 2.56 MB ≈ 327.68 GB (显存需求已显著超过模型本身的权重开销)
 ```
 
-这就是为什么长上下文推理如此昂贵——不是因为计算，而是因为**内存**。
+长文本推理之所以成本高昂，核心矛盾并非来自 GPU 的算力上限，而是受限于高带宽显存（HBM）的物理容量与读写吞吐。
 
-### PagedAttention：像操作系统一样管理 KV Cache
+### PagedAttention：操作系统级显存分页管理
 
-[vLLM](https://github.com/vllm-project/vllm) 引入了 **PagedAttention**（[Kwon et al. 2023](https://arxiv.org/abs/2309.06180)），借鉴操作系统虚拟内存的思想管理 KV cache：
+针对传统服务框架为请求预分配连续显存导致的严重碎片化问题，vLLM 提出了 **PagedAttention**（Kwon et al., 2023），将操作系统的虚拟内存分页思想引入 KV Cache 管理：
 
 ```
-传统方式：为每个请求预分配最大长度的连续内存
-  → 大量内存碎片和浪费（实际序列长度远小于最大长度）
+连续预分配模式：为每个请求按照最长上下文分配连续显存池
+  → 产生大量内部碎片与外部碎片，有效显存利用率不足 40%
 
-PagedAttention：把 KV cache 分成固定大小的页（page）
-  → 按需分配，不需要连续内存
-  → 类似 OS 的虚拟内存和物理内存映射
-  → 内存利用率提升 2-4 倍
+PagedAttention 模式：将 KV Cache 切分为固定尺寸的物理 Block（页）
+  → 建立逻辑页到非连续物理页的页表映射
+  → 实现零显存碎片与跨请求前缀的写时复制（Copy-on-Write）
+  → 显存吞吐与并发服务容量提升 2 至 4 倍
 ```
 
-这不是一个纯学术的优化——它直接决定了同一台 GPU 上能同时服务多少个请求，影响推理成本。
+这一架构级创新直接重塑了大规模语言模型在线推理集群的吞吐天花板与部署成本。
 
 ---
 
-## 2.7 可视化：看看 Attention 在看什么
+## 2.7 可视化：注意力图谱的微观观测
 
-理论说了很多，让我们实际看看 attention 的模式。
+通过工具对模型内部的注意力矩阵进行可视化，能够直观印证上述理论机制。
 
-### 使用 BertViz 可视化
-
-[BertViz](https://github.com/jessevig/bertviz) 是一个优秀的 attention 可视化工具：
+### 使用 BertViz 进行交互式分析
 
 ```python
 from bertviz import head_view
@@ -484,39 +481,37 @@ tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 head_view(attention, tokens)
 ```
 
-### 你会看到的典型模式
+### 典型注意力模式剖析
 
-**1. 主谓一致头**
+**1. 主谓对齐头**
 
 ```
 "The dogs in the park are running fast"
 
    dogs ←←←←←←←←←← are
-   (Head 3, Layer 5 高度关注 subject-verb 关系)
+   (特定 head 在跨越介词短语障碍后，精准将谓语与主语建立高权重连接)
 ```
 
-即使 "dogs" 和 "are" 之间隔了 "in the park"，某些 head 也能精准地把动词的注意力指向主语。
-
-**2. 指代消解头**
+**2. 先行词消解头**
 
 ```
 "Alice told Bob that she would help him tomorrow"
 
-   she →→→→→→→→→→→ Alice    (代词指回先行词)
+   she →→→→→→→→→→→ Alice    (代词精准回溯指向对应主体)
    him →→→→→→→→→ Bob
 ```
 
-**3. 位置关注头**
+**3. 邻域平滑头**
 
-某些 head 专门关注相邻位置（前一个 token 或后一个 token），充当"局部上下文"的角色。这些 head 的注意力模式呈对角线条纹。
+部分头呈现清晰的次对角线分布，负责在局部窗口内平滑语境表征，充当局部 $n$-gram 提取器的功能。
 
-**4. 分隔符关注头**
+**4. 标点汇聚头**
 
-某些 head 把大量注意力放在句号、逗号等标点上。推测是因为标点携带句子边界信息。
+大量注意力集中于句号、换行符等特殊标记。研究表明，标点符号常被模型用作信息暂存与广播的全局路由中继站。
 
-### 一个有趣的发现
+### 深浅隐层的特征表征演进
 
-在 GPT-2 的可视化研究中，研究者发现浅层（前几层）的 head 主要做局部的、句法的关注，而深层的 head 做更抽象的、语义的关注。这符合直觉：模型先"解析"句子结构，然后在此基础上"理解"含义。
+观测表明，注意力机制在网络深度上呈现由表及里的演进规律：网络浅层（底层）主要完成局部的分词拼装与浅层句法对齐，而网络深层（高层）则逐步抽象为全局语义消歧、实体关系追踪与逻辑推理。这一自底向上的抽象过程，构成了深度架构强大表达能力的基础。
 
 ---
 
@@ -524,43 +519,43 @@ head_view(attention, tokens)
 
 ```mermaid
 graph TB
-    A["Attention 是什么？"] --> B["信息路由机制：每个 token 从全序列按需读取"]
+    A["Attention 的本质"] --> B["动态信息路由网络：全序列按需寻址"]
     
-    C["QKV"] --> D["Q=查询, K=索引, V=内容"]
-    D --> E["Softmax(QK^T/√d_k) × V"]
+    C["QKV 机制"] --> D["Q=查询需求, K=索引暴露, V=内容载荷"]
+    D --> E["Softmax(QK^T / √d_k) × V"]
     
-    F["Multi-Head"] --> G["多组 QKV 并行，各捕捉不同关系"]
-    G --> H["句法头 / 语义头 / 位置头 / ..."]
+    F["Multi-Head 多头"] --> G["正交子空间并行投影，解耦复合语义"]
+    G --> H["句法头 / 语义头 / 局部头 / 标点头"]
     
-    I["Induction Head"] --> J["[A][B]...[A] → 预测 [B]"]
-    J --> K["in-context learning 的基础机制"]
+    I["Induction Head"] --> J["[A][B]...[A] → 预测 [B] 的双层回路"]
+    J --> K["上下文学习与少样本迁移的底层机理"]
     
-    L["位置编码"] --> M["RoPE: 用旋转编码相对位置"]
+    L["位置编码"] --> M["RoPE：基于复数旋转的相对距离建模"]
     
-    N["KV Cache"] --> O["缓存已计算的 K 和 V，避免重复计算"]
-    O --> P["PagedAttention: 虚拟内存式管理"]
+    N["KV Cache"] --> O["缓存历史 Key 与 Value，消除自回归冗余计算"]
+    O --> P["PagedAttention：虚拟内存分页降低显存碎片"]
 ```
 
 核心要点：
 
-1. **Attention = 信息路由**，不是"注意力"——每个 token 从全序列中按需读取信息
-2. **QKV 三元组**是 attention 的核心：Query 找信息、Key 被匹配、Value 提供内容
-3. **Multi-head** 让模型同时追踪多种关系类型
-4. **Induction head** 是 in-context learning 的最基本机制
-5. **RoPE** 给 Transformer 赋予了位置感知能力
-6. **KV cache** 是推理效率的关键优化，但内存成本随序列长度线性增长
-7. **上下文窗口是硬限制**——模型真的看不到窗口外的 token
+1. **Attention 的本质是信息路由**：摆脱了 RNN 的串行瓶颈，赋予 token 在全局序列中按需寻址的能力；
+2. **QKV 三元组构建软寻址通道**：Query 负责寻址，Key 负责被索引，Value 负责承载实际信息；
+3. **Multi-Head 实现了多维语义解耦**：多组正交投影使得模型能够同时捕获句法、逻辑与实体指代；
+4. **Induction Head 构成了上下文学习的原语**：两层级联的注意力回路使网络自发演化出模式复现算法；
+5. **RoPE 赋予模型相对位置感知**：通过旋转几何结构优雅融入序列时序信息；
+6. **KV Cache 决定了在线推理的显存天花板**：长序列推理的关键约束在于显存带宽与容量而非纯粹算力；
+7. **上下文窗口构成刚性边界**：处于窗口之外的信息在前向传播中完全不可见。
 
-下一章，我们将缩小视野，看看当这些模块被堆叠到极致规模时，会发生什么——规模如何改变一切。
+在下一章中，我们将进一步拉开视野，探讨当这些基础模块在算力驱动下堆叠至万亿参数规模时，系统将展现出何种统计规律与涌现特性。
 
 ---
 
 ## 延伸阅读
 
-- [Attention Is All You Need](https://arxiv.org/abs/1706.03762) — Vaswani et al. 2017, Transformer 的原始论文
-- [In-context Learning and Induction Heads](https://arxiv.org/abs/2209.11895) — Olsson et al. 2022
-- [What Does BERT Look At?](https://arxiv.org/abs/1906.04341) — Clark et al. 2019, attention 可视化分析
-- [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864) — Su et al. 2021
-- [Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180) — Kwon et al. 2023
-- [BertViz](https://github.com/jessevig/bertviz) — 交互式 attention 可视化工具
-- [A Mathematical Framework for Transformer Circuits](https://transformer-circuits.pub/2021/framework/index.html) — Elhage et al. 2021
+- Attention Is All You Need, Vaswani et al., 2017: https://arxiv.org/abs/1706.03762
+- In-context Learning and Induction Heads, Olsson et al., 2022: https://arxiv.org/abs/2209.11895
+- What Does BERT Look At?, Clark et al., 2019: https://arxiv.org/abs/1906.04341
+- RoFormer: Enhanced Transformer with Rotary Position Embedding, Su et al., 2021: https://arxiv.org/abs/2104.09864
+- Efficient Memory Management for Large Language Model Serving with PagedAttention, Kwon et al., 2023: https://arxiv.org/abs/2309.06180
+- BertViz (注意力交互式可视化工具): https://github.com/jessevig/bertviz
+- A Mathematical Framework for Transformer Circuits, Elhage et al., 2021: https://transformer-circuits.pub/2021/framework/index.html

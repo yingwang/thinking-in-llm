@@ -7,9 +7,9 @@
 
 **Glossary**: [English terminology](GLOSSARY.md)
 
-For engineers who can program and are using, or want to use, LLMs to build products. No machine learning background is required.
+For software engineers who can program and are building, or plan to build, products powered by LLMs. No prior background in machine learning is required.
 
-## The Logic of This Book
+## The Architecture of This Book
 
 ```mermaid
 flowchart LR
@@ -59,9 +59,9 @@ flowchart LR
     style P4 fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c
 ```
 
-**Core logic**: understand how LLMs "think" -> understand their boundaries -> build from the right mental model -> then look at the frontier.
+**Core trajectory**: Understand how LLMs compute -> Map their fundamental boundaries -> Architect systems with the right mental model -> Explore the frontier.
 
-Most material is either pure theory, such as papers, or pure practice, such as prompt cookbooks. This book derives **"how to do it" from "why it works"**. Once you understand attention, you can reason about what makes a prompt effective. Once you understand scaling laws, you can reason about when to switch to a larger model instead of tuning the prompt.
+Most available literature leans toward extremes: purely theoretical papers on one side, empirical prompt cookbooks on the other. This book bridges that divide by deriving **how to build** directly from **how LLMs work**. When you grasp the mechanics of attention, designing effective prompts becomes second nature. When you understand scaling laws, you can readily discern whether to refine a prompt or migrate to a larger model class.
 
 ## Table of Contents
 
@@ -72,7 +72,7 @@ Most material is either pure theory, such as papers, or pure practice, such as p
 | 1 | [Everything Is Continuation](chapters/01-next-token.md) | An LLM does only one thing: predict the next token |
 | 2 | [Attention Is Information Routing](chapters/02-attention.md) | Every token asks, "Where should I look?" |
 | 3 | [Emergence From Scale](chapters/03-scaling.md) | Why do large models suddenly "get it"? |
-| 4 | [From Pretraining to Alignment](chapters/04-alignment.md) | Alignment does not change capability, only expression |
+| 4 | [From Pretraining to Alignment](chapters/04-alignment.md) | Alignment does not create capability; it shapes expression |
 
 ### Part II: The Capability Boundaries of LLMs (The Boundaries)
 
@@ -80,8 +80,8 @@ Most material is either pure theory, such as papers, or pure practice, such as p
 |---|---------|---------------|
 | 5 | [What LLMs Are Truly Good At](chapters/05-strengths.md) | Pattern recognition, transformation, compression |
 | 6 | [The Hard Limitations of LLMs](chapters/06-limitations.md) | Why counting, arithmetic, and long-range reasoning fail |
-| 7 | [The Nature of Hallucination](chapters/07-hallucination.md) | Hallucination is not a bug; it is inevitable for a continuation engine |
-| 8 | [Reasoning or Imitation?](chapters/08-reasoning.md) | CoT, reasoning models, System 1 vs 2 |
+| 7 | [The Nature of Hallucination](chapters/07-hallucination.md) | Hallucination is not a bug; it is an inherent feature of continuation |
+| 8 | [Reasoning or Imitation?](chapters/08-reasoning.md) | CoT, reasoning models, System 1 vs System 2 |
 
 ### Part III: Building With LLMs (The Practice)
 
@@ -89,14 +89,14 @@ Most material is either pure theory, such as papers, or pure practice, such as p
 |---|---------|---------------|
 | 9 | [Prompt Is Programming](chapters/09-prompting.md) | System prompt = class definition, few-shot = test cases |
 | 10 | [Three Paths for Knowledge Injection](chapters/10-knowledge.md) | RAG vs Fine-tuning vs Long Context |
-| 11 | [First Principles of Agents](chapters/11-agents.md) | Tool use extends token space into the real world |
+| 11 | [First Principles of Agents](chapters/11-agents.md) | Tool use extends token space into the external environment |
 | 12 | [Evaluation: The Most Underestimated Step](chapters/12-evaluation.md) | Write evals first, then tune the system |
 
 ### Part IV: Frontier and Future (The Frontier)
 
 | # | Chapter | Core Question |
 |---|---------|---------------|
-| 13 | [Interpretability: Opening the Black Box](chapters/13-interpretability.md) | What is happening inside the model? |
+| 13 | [Interpretability: Opening the Black Box](chapters/13-interpretability.md) | What is happening inside the network? |
 | 14 | [Multimodal: Beyond Text](chapters/14-multimodal.md) | Images, audio, and video all become tokens |
 | 15 | [The Future of LLMs](chapters/15-future.md) | Will scaling hit a wall? |
 
@@ -104,18 +104,18 @@ Most material is either pure theory, such as papers, or pure practice, such as p
 
 | | [Training Guide](https://github.com/yingwang/llm-tutorial) | Thinking in LLM |
 |---|---|---|
-| **Perspective** | How to **build** LLMs | How to **understand and use** LLMs |
-| **Reader** | Training engineers | All LLM developers |
-| **Prerequisite** | Requires ML background | Only requires programming background |
-| **Goal** | Train models | Design LLM systems |
+| **Perspective** | How to **train** LLMs | How to **understand and apply** LLMs |
+| **Audience** | Training engineers | Software engineers and system designers |
+| **Prerequisite** | Machine learning background | Core programming proficiency |
+| **Objective** | Train and optimize models | Architect robust LLM systems |
 
-The two books complement each other: the training guide teaches you how to build the engine; this book teaches you how to drive. Not as a driving-school manual, but as driving after understanding how the engine works.
+The two books complement each other: the training guide demonstrates how to build the engine, whereas this book teaches you how to drive it; not through superficial recipes, but through a first-principles understanding of the mechanics under the hood.
 
-## How to Read
+## Recommended Reading Paths
 
-- **From beginning to end**: Part I -> II -> III -> IV. Each part builds on the previous one.
-- **If you are short on time**: Chapter 1 -> Chapter 6 -> Chapter 9 -> Chapter 11 (the four core chapters).
-- **If you already have the basics**: Jump to Part III, and go back to Part I/II when you encounter something unclear.
+- **Comprehensive path**: Read sequentially from Part I through Part IV. Each section establishes the foundation for the next.
+- **Fast-track path**: Chapter 1 -> Chapter 6 -> Chapter 9 -> Chapter 11 (the four foundational pillars).
+- **Practitioner path**: Jump straight to Part III, referring back to Parts I and II as theoretical questions arise.
 
 ## Author
 

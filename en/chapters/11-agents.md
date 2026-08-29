@@ -2,694 +2,479 @@
 
 **中文**: [中文](../../chapters/11-agents.md)
 
-# Chapter 11: First Principles of Agents
+# Chapter 11: First Principles of Autonomous Agents
 
-> "An agent is just a while loop with a tool call." - In practice, this is mostly true, but it is also only half the story.
+> "An agent is simply a while-loop bound to a tool invocation socket — an elegant reduction that is both practically true and conceptually incomplete."
 
-"Agent" has been the most overused word of the past two years. From AutoGPT to LangChain agents, and then to OpenAI's GPTs and Anthropic's Computer Use, every project calls itself an agent, but the definitions all differ.
+"Agent" has become the most overloaded term in modern artificial intelligence. From early open-loop scripts like AutoGPT to sophisticated multi-turn protocols like Anthropic Computer Use and OpenAI Operator, virtually every autonomous pipeline claims the mantle of an agent.
 
-This chapter will not argue over terminology. We will do something more useful: starting from the perspectives established in Chapters 9 and 10 - "prompting is programming" and "knowledge injection" - we will **derive** what an agent is, when it is needed, and how to design one without letting it go off the rails.
+Rather than debating semantic taxonomy, this chapter derives the mechanics of agents from first principles: extending the foundational insights of Chapter 9 (prompting as software programming) and Chapter 10 (grounded knowledge injection).
 
-Core claims:
+Core architectural principles:
 
-1. **The essence of an agent is extending the LLM's token space into the real world**
-2. **The fundamental difficulty of agents is that autoregressive models lack the ability to perform "lookahead planning"**
-3. **Most systems advertised as "agents" are actually solvable with a single prompt**
-4. **The best agent designs are often the simplest**
-
-After reading this chapter, you will have a clear criterion for "when to use an agent, and when not to" and will know the most common root causes of failure in production agent systems.
+1. **The essence of an agent is extending an autoregressive model's discrete token space into the non-stationary physical and digital world.**
+2. **The fundamental failure mode of agents stems from autoregressive blindness: language models generate sequentially without native lookahead tree search.**
+3. **Most enterprise tasks branded as 'agents' are far more reliably implemented as deterministic workflows.**
+4. **The most resilient production agents are deliberately minimalist.**
 
 ---
 
-## 11.1 What Is an Agent: Starting from Token Space
+## 11.1 Deconstructing the Agent: Extending the Token Space
 
-### A Minimal Definition
+### The Minimal Architecture
 
-Leaving aside all the fancy terminology, an agent can be defined like this:
+Stripping away framework abstractions reveals the irreducible core of an autonomous agent:
 
-> **Agent = LLM + Tool Use + Loop**
->
-> An LLM does the following in a loop: observe → think → call a tool → receive a new observation → continue.
+$$\text{Agent} = \text{Autoregressive Policy (LLM)} + \text{Tool Interfaces} + \text{State Feedback Loop}$$
 
 ```python
-def minimal_agent(task, tools, max_steps=10):
-    history = [task]
-    for _ in range(max_steps):
-        response = llm.generate(history, tools=tools)
-        if response.is_final_answer():
-            return response.text
-        # Otherwise it is a tool call
-        result = execute(response.tool_call)
-        history.append(response)
-        history.append(result)
-    return "Max steps reached"
+def minimal_agent_loop(task_objective: str, tool_registry: list, max_iterations: int = 10) -> str:
+    """The irreducible execution loop of an autonomous agent."""
+    conversation_state = [{"role": "user", "content": task_objective}]
+    
+    for step in range(max_iterations):
+        # Step 1: Deliberate and evaluate next action
+        response = llm_policy.generate(conversation_state, tools=tool_registry)
+        
+        # Step 2: Check terminal completion state
+        if response.is_terminal_completion():
+            return response.final_text
+            
+        # Step 3: Intercept and execute structured tool call
+        execution_result = dispatch_system_tool(response.tool_call)
+        
+        # Step 4: Inject environmental observation back into context
+        conversation_state.append(response.as_message())
+        conversation_state.append({"role": "tool", "content": execution_result})
+        
+    return "Iteration limit exceeded without convergence."
 ```
 
-This is the "skeleton" of an agent. **All agent frameworks - LangChain, AutoGPT, CrewAI, Anthropic Computer Use - are essentially variants of this 7-line loop**, refined around tool sets, loop control, and error recovery.
+Every major agent framework—LangChain, AutoGPT, CrewAI, and native Computer Use protocols—is structurally isomorphic to this execution loop, augmented with memory serialization, concurrency scaffolding, and telemetry hooks.
 
-### First-Principles View: Tool Use Extends Token Space
+### Tool Invocation as State Projection
 
-Recall Chapter 1: an LLM "continues text in token space".
+Recall the governing premise of Chapter 1: foundation models operate strictly within a discrete vocabulary token space $\mathcal{V}$.
 
-The token space of an ordinary LLM is closed: it only contains things seen in the training data. But when you give an LLM tools:
+A base language model is an epistemically closed system: its inference cannot interact with anything outside its context window. Tool calling bridges this boundary, projecting external world state $\mathcal{S}$ directly into token space:
 
 ```mermaid
 flowchart LR
-    subgraph NormalLLM["Normal LLM"]
-        T1["Token space<br>= training data"]
-        T1 --> O1["Output<br>(plain text)"]
+    subgraph BaseLLM["Closed Parametric Model"]
+        T1["Discrete Token Space V<br/>(Static Pretraining Prior)"] --> O1["Standard Text Completion"]
     end
 
-    subgraph Agent["LLM + Tools"]
-        T2["Token space<br>= training data"]
-        T2 --> Call["Generate tool_call"]
-        Call --> World["Real world<br>(API/DB/files/browser)"]
-        World --> Obs["New tokens<br>(observation result)"]
-        Obs --> T2
-        T2 --> O2["Output<br>(can change the world)"]
+    subgraph AgentLoop["Agentic System (LLM + Tool Sockets)"]
+        T2["Discrete Token Space V"] --> Action["Emit Tool Call Schema"]
+        Action --> World["Host Runtime Environment<br/>(SQL DB / REST API / Bash Sandbox)"]
+        World --> Observation["Host State Telemetry<br/>(JSON / stdout / DOM Tree)"]
+        Observation --> Injection["Token Ingestion into KV Cache"]
+        Injection --> T2
     end
 
-    style T1 fill:#fff9c4
-    style World fill:#bbdefb
-    style O2 fill:#c8e6c9
+    style T1 fill:#fff9c4,stroke:#fbc02d
+    style World fill:#bbdefb,stroke:#0d47a1
+    style Injection fill:#c8e6c9,stroke:#1b5e20
 ```
 
-**Tool use is not "letting AI use tools" - it is turning the real world into tokens that the LLM can read and write**.
+**Tool invocation does not grant 'agency' to a neural network; it translates environmental state transitions into token sequences that condition the next forward pass.**
 
-- Run a database query → the JSON returned by the database enters the token sequence
-- Browse a web page → DOM text enters the token sequence
-- Execute a piece of code → stdout enters the token sequence
-- Send an email → "email sent" enters the token sequence
+- A PostgreSQL query translates database tables into structured JSON tokens.
+- A headless browser translates web DOM nodes into accessibility tree tokens.
+- A Python interpreter translates runtime exceptions into stack trace tokens.
 
-The LLM is still only continuing text in token space. But tools have extended that token space far beyond the scope of the training data.
-
-Understanding this explains many design choices:
-
-- Why tool output format matters → it must become tokens the LLM can "understand"
-- Why browser automation is hard → web page DOM is a huge, noisy token stream
-- Why function calling is more reliable than textual conventions → structured tokens are easier to control than free text
+Understanding tool use as token projection clarifies key engineering constraints:
+1. **Serialization Density**: Tool observations must be concise; verbose raw DOM or multi-megabyte log streams saturate the KV cache with high-entropy noise.
+2. **Strict Schema Constraints**: Tool calls must be generated as grammar-constrained JSON rather than free text to eliminate syntax parsing failures.
 
 ---
 
-## 11.2 ReAct: The Think-Act-Observe Loop
+## 11.2 The ReAct Paradigm: Interleaved Thought and Action
 
-### The Classic Pattern
+### Theoretical Mechanics
 
-ReAct (Reasoning + Acting) was proposed by Yao et al. (2022) in [_ReAct: Synergizing Reasoning and Acting in Language Models_](https://arxiv.org/abs/2210.03629). It defines the standard structure of an agent loop:
+The foundational paradigm governing agentic execution is **ReAct** (Reasoning + Acting) ([Yao et al., 2022](https://arxiv.org/abs/2210.03629)), which mandates that an agent generate an explicit verbal deliberation trace ($\text{Thought}_t$) prior to emitting an executable payload ($\text{Action}_t$):
 
 ```
-Thought: I need to find information about X. Search first.
-Action: search("X")
-Observation: Search returned [...]
-Thought: The results mention Y. I need to look up the exact definition of Y.
-Action: search("Y")
-Observation: ...
-Thought: I now have enough information to answer the original question.
-Action: finish("Final answer")
+Goal: "Diagnose why microservice 'checkout-api' is experiencing 504 Gateway Timeouts in us-central-1."
+
+Trace Sequence:
+Thought: I must first query recent latency telemetry for 'checkout-api' across regions.
+Action: query_metrics(service="checkout-api", metric="p99_latency", region="us-central-1")
+Observation: {"p99_latency_ms": 14200, "upstream_dependency": "redis-auth"}
+
+Thought: The latency spike is localized to us-central-1 and correlates with 'redis-auth'. I will inspect connection pool exhaustion on redis-auth.
+Action: query_logs(service="redis-auth", filter="ERR_CONN_POOL_EXHAUSTED")
+Observation: {"error_count": 412, "active_connections": 1000, "pool_max": 1000}
+
+Thought: Root cause identified: redis-auth connection pool is saturated at max capacity (1000). I can now synthesize the incident remediation report.
+Action: complete_investigation(summary="Redis connection pool saturation in us-central-1")
 ```
-
-Each loop step contains:
-- **Thought**: the model reasons out loud (an echo of CoT in agent scenarios)
-- **Action**: the model calls a tool
-- **Observation**: the result returned by the tool
-
-ReAct's key insight: **making the model reason explicitly before calling a tool works much better than calling tools directly**.
-
-Why? Return to Chapter 8: CoT gives the model "scratch paper". In agent scenarios, what needs to be written on the "scratch paper" is "which tool should I use now, why, and with what parameters". Without this step, the model can easily call tools chaotically.
-
-### Modern Implementations
-
-Anthropic and OpenAI's function calling interfaces are essentially syntactic sugar for ReAct:
-
-```python
-# Anthropic style
-response = client.messages.create(
-    model="claude-opus-4-7",
-    tools=[{
-        "name": "search",
-        "description": "Search the internet",
-        "input_schema": {...}
-    }],
-    messages=[{"role": "user", "content": "What are the latest developments in X?"}]
-)
-
-# The model may return:
-# - thinking block: <thinking>I need to search X...</thinking>  ← Thought
-# - tool_use block: {"name": "search", "input": {"query": "X"}}  ← Action
-#
-# After executing it, feed the tool_result back in:
-client.messages.create(
-    model="claude-opus-4-7",
-    messages=[
-        ...previous,
-        {"role": "user", "content": [
-            {"type": "tool_result", "tool_use_id": ..., "content": "..."}  # ← Observation
-        ]}
-    ]
-)
-```
-
-The pattern has not changed: thinking/tool_use/tool_result simply use a structured schema instead of plain text.
-
----
-
-## 11.3 The Fundamental Difficulty of Agents: No Lookahead Planning
-
-### Autoregression = Taking One Step at a Time
-
-Chapters 6 and 8 have already mentioned this problem repeatedly: autoregressive generation means the model "takes one step and then sees", without real lookahead.
-
-In agent scenarios, this problem is **magnified**. Each step an agent takes may cost seconds to minutes (tool calls), and each step changes world state (which may not be reversible).
 
 ```mermaid
 flowchart TD
-    subgraph HumanPlanning["How humans act"]
-        H1["See the task"] --> H2["Think through the overall process"]
-        H2 --> H3["Mentally simulate<br>the possible outcome of each step"]
-        H3 --> H4["Find that one path<br>will fail"]
-        H4 --> H5["Switch to another path"]
-        H5 --> H6["Start executing"]
-    end
+    Obs["Observation Token Ingestion (t)"] --> Thought["Verbal Deliberation Trace: 'Thought t'<br/>(Expands Effective Circuit Depth)"]
+    Thought --> Action["Executable Grammar Call: 'Action t'<br/>(Intercepted by Host Environment)"]
+    Action --> Exec["Host Execution in Sandbox"]
+    Exec --> NextObs["Observation Token Ingestion (t+1)"]
+    NextObs --> NextThought["Verbal Deliberation Trace: 'Thought t+1'"]
 
-    subgraph Agent["LLM Agent"]
-        A1["See the task"] --> A2["Step 1: do this first"]
-        A2 --> A3["Execute → see result"]
-        A3 --> A4["Step 2: do this next"]
-        A4 --> A5["Execute → see result"]
-        A5 --> A6["Step 3 reveals the path was wrong"]
-        A6 --> A7["But irreversible things have already been done..."]
-    end
-
-    style HumanPlanning fill:#c8e6c9
-    style Agent fill:#ffcdd2
+    style Thought fill:#fff9c4,stroke:#fbc02d
+    style Action fill:#bbdefb,stroke:#0d47a1
+    style Exec fill:#f8bbd0,stroke:#880e4f
+    style NextObs fill:#c8e6c9,stroke:#1b5e20
 ```
 
-An LLM agent does not have the ability to "simulate in its mind". Its way of "thinking about the next step" is to actually take it.
+### Why Deliberation Traces Are Architecturally Essential
 
-This leads to several common failures:
+Why does forcing the generation of an explicit `Thought` token block prevent catastrophic agent failure?
 
-**Failure 1: Inefficient detours**
-
-```
-Task: Convert all .csv files in /tmp/data to .json
-
-Agent behavior:
-  Thought: First see what is in /tmp/data
-  Action: list_files("/tmp/data")
-  Observation: [a.csv, b.csv, c.csv, ..., z.csv]  // 26 files
-  Thought: Process a.csv
-  Action: read_file("/tmp/data/a.csv")
-  Action: write_file("/tmp/data/a.json", ...)
-  Thought: Process b.csv
-  Action: read_file("/tmp/data/b.csv")
-  ...
-
-(A single line of bash could do this)
-```
-
-**Failure 2: Getting stuck in a loop**
-
-```
-Task: Find the file that contains "secret"
-
-Agent behavior:
-  Action: search_in_file("a.txt", "secret")
-  Observation: not found
-  Action: search_in_file("a.txt", "secret")  // Tries the same thing again
-  Observation: not found
-  Action: search_in_file("a.txt", "Secret")  // Changes case and keeps circling
-  ...
-```
-
-**Failure 3: Irreversible errors**
-
-```
-Task: Clean up the temporary directory
-
-Agent behavior:
-  Thought: Clean old files under /tmp
-  Action: delete_files("/tmp/old_*")
-  Observation: Deleted 500 files
-  Thought: Wait, that pattern included the user's work files...
-
-(Cannot be undone)
-```
-
-These are not examples of a poorly written prompt; they are **structural problems of autoregressive agents**.
+Recall the computational complexity analysis from Chapter 8: **generating intermediate tokens provides virtual depth to the feedforward attention stack**. When an agent directly emits a tool payload without preceding deliberation tokens, it is forced to compress intent classification, parameter validation, and dependency resolution into a single forward pass. Emitting a verbal scratchpad allows the network to route its attention across historical observations before selecting the tool schema.
 
 ---
 
-## 11.4 Several Strategies for Mitigating the Lookahead Problem
+## 11.3 The Fundamental Architectural Dilemma: Autoregressive Blindness
 
-These strategies cannot eliminate it, but they can mitigate it.
+### The Lookahead Planning Deficit
 
-### Strategy 1: Have the Agent Write a Plan First
+Human engineers rarely execute production debugging by trying arbitrary actions at random. Humans construct internal mental models, simulate the probable downstream state transitions of several competing hypotheses, prune risky branches, and execute only when confident:
 
-```python
-prompt = f"""Task: {task}
+$$\text{Human Action Policy} \sim \arg\max_{\pi} \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{H} \mathcal{R}(s_t, a_t) \right]$$
 
-Before starting execution, please first write a complete execution plan. Include:
-1. What each step will do
-2. The expected result of each step
-3. If a step fails, what the fallback plan is
+Conversely, an autoregressive language model chooses actions **one token at a time based strictly on historical context $\mathcal{H}_t$**:
 
-After writing the plan, wait for my confirmation before starting execution.
-"""
-```
+$$\mathcal{P}(a_t \mid \mathcal{H}_t) = \prod_{i=1}^{k} \mathcal{P}(a_{t, i} \mid \mathcal{H}_t, a_{t, <i})$$
 
-This expands the scale of "autoregressive generation" from tokens to **plan units**. When the model generates the "plan" section, it is still autoregressive, but the generated content is a "description of the future", not actual execution. If it is wrong, it can be rewritten.
-
-Cost: one more round of conversation; the plan itself may be inaccurate. But this is still better than executing directly.
-
-### Strategy 2: Human-in-the-Loop
-
-Dangerous actions must require human confirmation:
-
-```python
-DANGEROUS_TOOLS = ["delete_file", "send_email", "execute_payment", "rm", "drop_table"]
-
-def execute_with_approval(tool_call):
-    if tool_call.name in DANGEROUS_TOOLS:
-        approval = ask_user(f"About to execute: {tool_call}\nConfirm? (y/n)")
-        if not approval:
-            return "User refused execution"
-    return execute(tool_call)
-```
-
-This is not a technical problem; it is a product problem. Anthropic Computer Use and Claude Code both have similar "permission prompt" mechanisms, giving users a kill switch.
-
-### Strategy 3: Limit the Search Space
-
-Do not give an agent too many tools, and do not give it too much freedom. **The tighter the constraints, the less likely it is to run off course**.
-
-```python
-# Bad: give 30 tools and let the model choose by itself
-tools = [...30 tools...]
-
-# Better: first decide the "tool subset" based on task type
-def get_tools_for_task(task_type):
-    if task_type == "data_analysis":
-        return [read_csv, run_sql, plot]
-    if task_type == "web_research":
-        return [search, fetch_url, summarize]
-    ...
-
-tools = get_tools_for_task(classify(user_request))
-```
-
-This turns the problem of "agent improvisation" **partly back into "routing + constrained agent"**. The latter is more controllable.
-
-### Strategy 4: Limit Loop Depth and Width
-
-```python
-def safe_agent_loop(task, max_steps=10, max_same_action_repeat=3):
-    history = []
-    action_counts = Counter()
-
-    for step in range(max_steps):
-        response = llm.generate(history)
-        if response.is_final():
-            return response
-
-        # Detect repetition
-        action_key = (response.tool_call.name, response.tool_call.input)
-        action_counts[action_key] += 1
-        if action_counts[action_key] > max_same_action_repeat:
-            return f"Repeated action detected, forced exit: {action_key}"
-
-        result = execute(response.tool_call)
-        history.append((response, result))
-
-    return "Reached maximum number of steps"
-```
-
-Do not let the agent decide when to stop by itself; its judgment is unreliable.
-
----
-
-## 11.5 Reflection: Letting the Agent Inspect Itself
-
-### Let the Agent Self-Criticize
-
-Shinn et al. (2023)'s [_Reflexion_](https://arxiv.org/abs/2303.11366) proposes an intuitively simple pattern:
-
-```mermaid
-flowchart LR
-    T["Task"] --> A1["Agent attempt"]
-    A1 --> R1{"Succeeded?"}
-    R1 -->|Yes| OK["Done"]
-    R1 -->|No| Critic["Have the model reflect<br>'Where did I go wrong?'"]
-    Critic --> Memory["Write into memory"]
-    Memory --> A2["Agent retries<br>(with reflective memory)"]
-    A2 --> R1
-
-    style OK fill:#c8e6c9
-    style Critic fill:#fff9c4
-```
-
-```python
-def reflexive_agent(task, max_attempts=3):
-    reflections = []
-    for attempt in range(max_attempts):
-        history = [task] + reflections
-        result = run_agent(history)
-
-        if evaluate(result, task):  # Success
-            return result
-
-        # Failure → have the model reflect
-        reflection = llm.generate(f"""
-        Task: {task}
-        My attempt: {result}
-        I did not complete the task. Please reflect:
-        - Which step did I get wrong?
-        - What should I do next time?
-        Please give 1-2 specific lessons.
-        """)
-        reflections.append(f"Lesson from last time: {reflection}")
-
-    return "All attempts failed"
-```
-
-This pattern works because **reviewing is easier than generating**. This is the asymmetry already discussed in Chapter 7.
-
-### Use Carefully: Limits of Self-Review
-
-But remember the warning from Chapter 7: the model's ability to self-review is limited. If the critic and actor are the same model in the same conversation context, the quality of reflection will drop significantly; the model tends to defend its own mistakes.
-
-More reliable approaches:
-
-- Use a **different model** as the critic (for example, Sonnet as actor and Opus as critic)
-- **Clear the context**, so the critic cannot see the actor's "train of thought" and only sees inputs and outputs
-- Use a **deterministic verifier** (unit tests, assertions, schema checks) instead of a model critic
-
----
-
-## 11.6 Multi-Agent: The Benefits and Costs of Division of Labor
-
-### The Temptation of "Multiple Agents"
-
-An intuitive idea is that, since a single agent is hard to manage, we can divide the work: one agent specializes in research, one in coding, and one in review, with all of them collaborating. CrewAI, AutoGen, and Anthropic's agent protocol all move in this direction.
-
-Theoretical benefits:
-- **Focus**: each agent only does what it is good at, which makes prompts more focused
-- **Parallelism**: independent tasks can proceed simultaneously
-- **Explainability**: clear division of labor makes debugging easier
-
-### The Costs in Reality
-
-But in real production systems, the costs of multi-agent setups are often underestimated:
-
-**Cost 1: Communication cost explodes**
-
-```mermaid
-flowchart LR
-    subgraph SingleAgent["Single Agent"]
-        S["1 conversation<br>all context shared"]
-    end
-    subgraph MultiAgent["3 Agents"]
-        A1["Agent A"] <-->|"serialized context"| A2["Agent B"]
-        A2 <-->|"serialized context"| A3["Agent C"]
-        A1 <-->|"serialized context"| A3
-    end
-
-    style S fill:#c8e6c9
-    style A1 fill:#fff9c4
-    style A2 fill:#fff9c4
-    style A3 fill:#fff9c4
-```
-
-Every agent switch requires "translating" context into a form that another agent can understand. Information is lost and errors are introduced along the way.
-
-**Cost 2: Error contagion**
-
-If Agent A's output contains a hallucination and Agent B treats it as true, the error will be amplified further. The "reasoning hallucination" from Chapter 7 becomes "collaborative hallucination" in multi-agent systems - a group of agents confidently moving forward on a false premise.
-
-**Cost 3: Evaluation difficulty**
-
-If a single agent makes a mistake, you can see the complete conversation. If multiple agents collaborate and make a mistake, you have to trace "whose fault it was": perhaps A's output had a problem, perhaps B misunderstood it, or perhaps the protocol itself was flawed.
-
-**Cost 4: Cost and latency**
-
-Every agent is an LLM call. Collaboration among 3 agents = at least 3x the calls, and possibly more. If you want parallelism, engineering complexity also rises.
-
-### Anthropic's Rule of Thumb
-
-Anthropic's engineering article ([_Building Effective Agents_](https://www.anthropic.com/research/building-effective-agents)) summarized it this way:
-
-> **Start with the simplest solution. Only introduce complexity when it is truly needed.**
->
-> Most systems reported as "agents" actually only need:
-> - A smart prompt
-> - Or a "prompt + tools" loop
-> - Or several prompts chained together (a workflow, not an agent)
-
-Do not adopt a multi-agent framework just because it "sounds advanced". Build a single agent well first; divide the work only when you encounter a specific bottleneck.
-
----
-
-## 11.7 Workflow vs Agent: A Commonly Confused Distinction
-
-### The Key Difference
-
-The same Anthropic article proposes a useful distinction:
-
-- **Workflow**: the process is **predefined**. Which tool and which prompt to use at each step are hard-coded by engineers. The LLM only makes local decisions at each step.
-- **Agent**: the process is **dynamic**. The LLM decides what to do next, which tool to use, and when to stop.
-
-```mermaid
-flowchart LR
-    subgraph WF["Workflow"]
-        W1["Step 1<br>(fixed)"] --> W2["Step 2<br>(fixed)"] --> W3["Step 3<br>(fixed)"]
-    end
-    subgraph AG["Agent"]
-        A1["LLM decision"] --> A2{"What should be done?"}
-        A2 --> Aa["Action 1"]
-        A2 --> Ab["Action 2"]
-        A2 --> Ac["Action 3"]
-        Aa --> A1
-        Ab --> A1
-        Ac --> A1
-    end
-
-    style WF fill:#c8e6c9
-    style AG fill:#fff9c4
-```
-
-### Decision Table
-
-| Dimension | Workflow | Agent |
-|------|---------|-------|
-| Control flow | Defined by engineers | Decided by the LLM |
-| Predictability | High | Low |
-| Debuggability | High | Low |
-| Flexibility | Low | High |
-| Applicable scenarios | Stable task structure | Open-ended task structure |
-| Failure modes | Cannot handle edge cases | Runs off course, loops forever, takes the wrong path |
-
-**Rule of thumb**:
-- If you can **draw the task's flowchart**, use a workflow
-- Use an agent only when **the process itself must change dynamically based on intermediate results**
-
-90% of products advertised as "agents" are actually workflows, and they are more reliable precisely because they are workflows.
-
-### An Example
-
-Task: read a PDF uploaded by the user and answer questions about its contents.
-
-**Workflow implementation**:
-```
-Step 1: PDF → text
-Step 2: text → chunks
-Step 3: chunks → embeddings → vector database
-Step 4: user question → embedding → retrieve top-k chunks
-Step 5: chunks + question → LLM → answer
-```
-
-**Agent implementation**:
-```
-Give the LLM tools: extract_pdf_text, chunk_text, search_chunks, answer_question
-Let the LLM decide the call order by itself
-```
-
-Which is better? **In almost all cases, the workflow is better**: it is fast, cheap, and predictable. An agent only has an advantage when user questions are highly diverse and require different retrieval strategies.
-
----
-
-## 11.8 Agent Design Patterns
-
-Putting the previous content together, here are several effective agent design patterns:
-
-### Pattern 1: Router
-
-The simplest "agent" dispatches to different workflows based on input.
-
-```python
-def router(user_input):
-    classification = llm.classify(user_input, ["coding", "research", "qa"])
-    if classification == "coding":
-        return coding_workflow(user_input)
-    elif classification == "research":
-        return research_workflow(user_input)
-    else:
-        return qa_workflow(user_input)
-```
-
-The control flow is written by humans; the decisions are made by the LLM. This is simple and reliable.
-
-### Pattern 2: Tool-Augmented LLM (Single-Loop ReAct)
-
-The most common true agent pattern is one LLM, a set of tools, and a loop. This is the standard usage of Anthropic Tool Use and OpenAI Function Calling.
-
-Suitable for: open-ended task structures that require a small number of tool calls (< 10 steps).
-
-### Pattern 3: Plan-and-Execute
-
-Have the LLM write a complete plan first, then execute each step separately.
-
-```python
-def plan_and_execute(task):
-    plan = llm.generate(f"Write a step-by-step plan for the following task: {task}")
-    results = []
-    for step in plan.steps:
-        result = execute_step(step)
-        results.append(result)
-    return synthesize(results)
-```
-
-Suitable for: tasks that can be planned in advance and have few dependencies between steps.
-
-### Pattern 4: Orchestrator-Workers
-
-An "orchestrator LLM" decides what needs to be done, and multiple "worker LLMs" execute in parallel. The results are then summarized.
-
-Suitable for: tasks that can be parallelized (such as batch-processing multiple documents).
-
-### Pattern 5: Reflection Loop
-
-Actor generates → Critic reviews → Actor improves → repeat until the result passes.
-
-Suitable for: tasks with clear quality standards (code, articles).
-
-### Selection Reference
+An LLM agent cannot natively perform tree search across unexecuted future actions without external algorithmic scaffolding. It 'thinks' about the next step by physically taking it in the host environment.
 
 ```mermaid
 flowchart TD
-    Q1{"Is the task process<br>fixed?"}
-    Q1 -->|"Yes"| Pure["Pure workflow<br>no agent"]
-    Q1 -->|"No, but finite branches"| Router["Router pattern"]
-    Q1 -->|"No, open-ended exploration"| Q2{"Expected<br>number of steps?"}
+    subgraph HumanCognition["Human Lookahead Deliberation"]
+        H1["Problem State"] --> H2["Mental Simulation of Path A"]
+        H2 --> H3["Path A Evaluated: High Risk of Data Loss ✗"]
+        H1 --> H4["Mental Simulation of Path B"]
+        H4 --> H5["Path B Evaluated: Verified Safe ✓"]
+        H5 --> H6["Execute Path B in Reality"]
+    end
 
-    Q2 -->|"Few (< 10)"| ReAct["Tool-augmented<br>(ReAct)"]
-    Q2 -->|"Medium (10-50)"| PE["Plan-and-Execute"]
-    Q2 -->|"Many + parallelizable"| OW["Orchestrator-<br>Workers"]
+    subgraph AutoregressiveAgent["Autoregressive Agent"]
+        A1["Problem State"] --> A2["Step 1: Execute Tool Call A"]
+        A2 --> A3["State Mutation Committed to Database"]
+        A3 --> A4["Step 2: Observe Path A Caused Data Loss"]
+        A4 --> A5["Catastrophic Failure: State Change Irreversible"]
+    end
 
-    Q1 --> Q3{"Need quality<br>control?"}
-    Q3 -->|"Yes"| Refl["+ Reflection Loop"]
-
-    style Pure fill:#c8e6c9
-    style Router fill:#c8e6c9
-    style ReAct fill:#fff9c4
-    style PE fill:#fff9c4
-    style OW fill:#ffcdd2
-    style Refl fill:#bbdefb
+    style HumanCognition fill:#c8e6c9,stroke:#1b5e20
+    style AutoregressiveAgent fill:#ffcdd2,stroke:#b71c1c
 ```
 
----
+### The Taxonomy of Agentic Failure Modes
 
-## 11.9 Engineering Checklist for Production Agents
-
-Before pushing an agent to production, go through this checklist:
-
-### Tool Design
-
-- [ ] Tools have clear, LLM-friendly descriptions (not docstrings written for humans)
-- [ ] Tool inputs have JSON schema (not free text)
-- [ ] Tool outputs are readable by the LLM (structured, not too long)
-- [ ] Tool error messages suggest "how to fix it" (rather than only saying that the call failed)
-- [ ] Dangerous tools have an independent permission layer (confirmation/approval)
-
-### Control Flow
-
-- [ ] There is a maximum step limit
-- [ ] There is repeated action detection
-- [ ] There are timeout mechanisms (per tool call + overall)
-- [ ] There is a retry strategy after failure (with backoff)
-- [ ] There is a "give up" mechanism (allowing the agent to gracefully say "I can't do this")
-
-### Observability
-
-- [ ] Every step has complete logs (thought + action + observation)
-- [ ] Token usage, latency, and cost are recorded
-- [ ] Errors are classified (tool error vs model error vs user error)
-- [ ] There are tracing tools (such as LangSmith, Langfuse, or self-built tooling)
-
-### Safety
-
-- [ ] Prompt injection defense (against malicious instructions from tool outputs)
-- [ ] Sensitive data is not leaked to tools (PII filtering)
-- [ ] Tool permissions are minimized (do not give the agent root)
-- [ ] Important actions have audit logs
-- [ ] There is a kill switch
-
-### Evaluation
-
-- [ ] There is a representative task set (not a single demo)
-- [ ] There is automated success-rate evaluation
-- [ ] There are cost/latency baselines
-- [ ] Regression tests can be run after prompt changes
-
-Chapter 12 will discuss evaluation specifically.
+1. **Pathological Exploration Loops**:
+   When a tool call returns an error or an empty result, the agent frequently repeats the identical invocation with trivial syntactic variations, trapped in an autoregressive deadlock.
+2. **Combinatorial Inefficiency**:
+   Lacking global planning, an agent will iteratively download, parse, and write 50 files sequentially via individual API calls rather than emitting a single vectorized batch command.
+3. **Irreversible Blast-Radius Mutations**:
+   Executing state-altering commands (e.g., `DROP TABLE`, `rm -rf`, modifying firewall routing rules) without prior lookahead verification can corrupt enterprise production systems.
 
 ---
 
-## 11.10 Counterintuitive: The Best Agents Are Often the Simplest
+## 11.4 Mitigating the Lookahead Blindspot: Architectural Guardrails
 
-Looking back at the claim from the beginning of this chapter: **the best agent designs are often the simplest**.
+While autoregression cannot be redesigned at inference time, systems engineering provides four architectural compensations:
 
-The reason complex agent systems fail is almost never that "the model is not strong enough"; it is complexity itself:
+### Pattern 1: Decoupled Plan-and-Execute
 
-- Too many tools → the model chooses the wrong one
-- Too many steps → errors accumulate
-- Too many roles → communication is distorted
-- Too many abstractions → debugging becomes impossible
+Instead of allowing the agent to improvise step-by-step actions, the orchestrator forces the model to synthesize a complete structural plan before granting execution permissions:
 
-And the reason simple agents succeed is:
+```python
+# Stage 1: Synthesize High-Level Architectural Plan
+planner_prompt = f"""Task Objective: {task_objective}
+Synthesize a declarative step-by-step execution plan.
+For each step, define:
+1. Target Tool & Exact Arguments
+2. Success Assertion Criterion
+3. Fallback Remediation Strategy
+Do NOT execute tool calls. Output strictly JSON."""
 
-- Few tools + clear descriptions → the model chooses correctly
-- Few steps + each step verifiable → errors can be discovered
-- Single LLM + complete context → decisions stay consistent
-- Clear control flow → debugging is easy
+execution_plan = planner_llm.generate(planner_prompt)
 
-In agent design, **Occam's razor matters more than "AI thinking"**. If a workflow can solve it, do not use an agent; if a single agent can solve it, do not use multiple agents; if 5 tools are enough, do not give it 50.
+# Stage 2: Execute and Validate Linearly
+for step in execution_plan.steps:
+    result = execute_step_with_assertion(step)
+    if not step.assertion_fn(result):
+        trigger_remediation_subroutine(step.fallback)
+```
+
+By decoupling planning from execution, the plan remains a mutable text artifact in memory that can be audited, modified, or rejected before mutating environmental state.
+
+### Pattern 2: Human-in-the-Loop (HITL) Blast-Radius Gates
+
+High-risk tool categories must be guarded by cryptographic or interactive permission gates:
+
+```python
+CRITICAL_TOOL_INVARIANTS = {
+    "purge_database_records": {"risk_tier": "HIGH", "requires_mfa": True},
+    "modify_security_group": {"risk_tier": "HIGH", "requires_mfa": True},
+    "fetch_telemetry_logs": {"risk_tier": "LOW", "requires_mfa": False}
+}
+
+def dispatch_system_tool(tool_invocation: ToolCall) -> str:
+    metadata = CRITICAL_TOOL_INVARIANTS.get(tool_invocation.name, {"risk_tier": "HIGH"})
+    
+    if metadata["risk_tier"] == "HIGH":
+        approval_token = request_operator_authorization(tool_invocation)
+        if not approval_token.is_valid():
+            return "Execution aborted: Operator denied authorization."
+            
+    return execute_sandboxed_driver(tool_invocation)
+```
+
+### Pattern 3: Search Space and Loop Depth Pruning
+
+Production agents should never be provisioned with unconstrained tool registries. Tool definitions must be dynamically filtered based on workload classification:
+
+```python
+# Restrict candidate tools to a strict task-specific domain
+def resolve_tool_registry(task_category: str) -> list[dict]:
+    registry_map = {
+        "database_triage": [query_sql, explain_plan, fetch_table_schema],
+        "log_analysis": [grep_logs, fetch_trace_spans, count_error_occurrences],
+        "code_patching": [read_source_file, apply_diff_patch, run_test_suite]
+    }
+    return registry_map.get(task_category, [fallback_read_only_tool])
+```
+
+## 11.5 Reflexion: Closed-Loop Metacognitive Optimization
+
+### The Metacognitive Iteration Cycle
+
+Shinn et al. ([2023](https://arxiv.org/abs/2303.11366)) formalized **Reflexion**, an architecture that equips autonomous agents with dynamic episodic memory buffers and heuristic self-evaluation:
+
+```mermaid
+flowchart LR
+    Goal["Task Objective"] --> Actor["Actor Agent<br/>(Trajectory Execution)"]
+    Actor --> ExecEnv["Host Environment<br/>(Sandbox / API)"]
+    ExecEnv --> Eval{"Deterministic Evaluator<br/>(Unit Tests / Assertions)"}
+    
+    Eval -->|Passed| Success["Terminal Success ✓"]
+    Eval -->|Failed| Critic["Critic Agent<br/>('Why did trajectory fail?')"]
+    
+    Critic --> MemoryBuffer[("Episodic Memory Buffer<br/>(Reflective Lessons)")]
+    MemoryBuffer --> Actor
+
+    style Success fill:#c8e6c9,stroke:#1b5e20
+    style Critic fill:#fff9c4,stroke:#fbc02d
+    style MemoryBuffer fill:#bbdefb,stroke:#0d47a1
+```
+
+```python
+def execute_reflexive_agent(task: str, max_trials: int = 3) -> str:
+    """Execute iterative task resolution with reflective memory feedback."""
+    episodic_reflections: list[str] = []
+    
+    for trial in range(max_trials):
+        # Inject accumulated heuristic lessons from previous failed trials
+        trial_context = construct_reflexion_context(task, episodic_reflections)
+        execution_trace = run_react_agent(trial_context)
+        
+        # Verify correctness using deterministic assertions
+        evaluation_result = verify_task_assertions(execution_trace)
+        if evaluation_result.is_successful:
+            return execution_trace.final_output
+            
+        # Failure: Invoke isolated Critic to synthesize root-cause diagnosis
+        critique_prompt = f"""Task Objective: {task}
+Failed Execution Trace: {execution_trace.formatted_log}
+Diagnostic Failure Reason: {evaluation_result.error_message}
+
+Analyze the trajectory failure. Identify the exact divergence step and emit 2 concise, actionable guidelines for the next trial."""
+
+        reflection = critic_llm.generate(critique_prompt)
+        episodic_reflections.append(f"Trial {trial + 1} Lesson: {reflection}")
+        
+    return "Task resolution aborted: Maximum trials exceeded."
+```
+
+### The Architectural Imperative of Critic Isolation
+
+As established in Chapter 7, asking a model to evaluate its own mistakes within the same conversational thread yields severe cognitive sycophancy: the network tends to rationalize erroneous tool parameters already committed to its KV cache.
+
+**Production Invariant**: The Critic must operate under a **sanitized, isolated context window**—ideally instantiated on a distinct frontier model checkpoint—evaluating the Actor's trace strictly against deterministic environment assertions.
 
 ---
 
-## Summary
+## 11.6 Multi-Agent Orchestration: The Hidden Economics of Coordination
 
-| Question | Answer |
-|------|------|
-| What is the essence of an agent? | LLM + Tools + Loop. It extends the LLM's token space into the real world |
-| What is the fundamental difficulty of agents? | Autoregressive generation = taking one step at a time, without real lookahead planning |
-| How can the lookahead problem be mitigated? | Explicit planning, human-in-the-loop, and limiting the tool set and loop depth |
-| What is ReAct? | A Thought-Action-Observation loop that makes the model reason explicitly before calling tools |
-| Is Reflection effective? | Yes, but avoid "reviewing itself" - the critic should be isolated from the actor |
-| Should multi-agent be used? | Use it cautiously. Communication cost and error contagion often exceed the benefits of division of labor |
-| Workflow vs Agent | Use a workflow if the process can be predefined; use an agent only when dynamic decisions are truly needed |
-| Design principle | Simpler is better. Complexity is the main root cause of agent failure |
+The industry frequently attempts to solve agent instability by distributing responsibilities across multi-agent collectives (e.g., CrewAI, AutoGen).
 
-In the next chapter, we discuss a seriously underestimated topic: **evaluation**. An agent without evals is essentially a demo.
+```mermaid
+flowchart LR
+    subgraph SingleAgent["Single Monolithic Agent"]
+        SA["Shared KV Cache<br/>Zero Serialization Loss"]
+    end
+
+    subgraph MultiAgent["Multi-Agent Swarm"]
+        MA1["Planner Agent"] <-->|"Natural Language JSON"| MA2["Coder Agent"]
+        MA2 <-->|"Natural Language JSON"| MA3["Reviewer Agent"]
+        MA1 <-->|"Natural Language JSON"| MA3
+    end
+
+    style SingleAgent fill:#c8e6c9,stroke:#1b5e20
+    style MultiAgent fill:#fff9c4,stroke:#fbc02d
+```
+
+While modular specialization is theoretically appealing, production deployment reveals steep hidden costs:
+
+1. **Context Serialization Tax**:
+   Every inter-agent handoff requires serializing state into natural language prompts. This translation introduces semantic loss and consumes massive token budgets.
+2. **Error Contagion and Hallucination Cascades**:
+   If Agent A emits a subtle factual confabulation, downstream Agent B accepts it as verified truth. The entire swarm compounds the hallucination with high statistical confidence.
+3. **Attribution and Telemetry Breakdown**:
+   Root-cause analysis in a swarm of five interacting agents becomes an intractable distributed debugging challenge.
+
+> **Anthropic's Architectural Maxim**: *"Start with the simplest possible design. Optimize a single well-grounded agent before introducing multi-agent orchestration."*
+
+---
+
+## 11.7 Workflows vs. Autonomous Agents: The Determinism Spectrum
+
+A critical systems distinction proposed by Anthropic ([2024](https://www.anthropic.com/research/building-effective-agents)) separates deterministic workflows from stochastic agents:
+
+- **Workflows**: Systems where the execution path is **statically engineered as a Directed Acyclic Graph (DAG)**. Foundation models execute local reasoning within fixed steps, but cannot alter the control flow.
+- **Autonomous Agents**: Systems where the **control flow is dynamic**. The model autonomously determines which subroutines to invoke, loops dynamically, and decides when to terminate.
+
+```mermaid
+flowchart LR
+    subgraph Workflow["Deterministic Workflow (High Predictability)"]
+        W1["Step 1: Extract JSON"] --> W2["Step 2: Vector Search"]
+        W2 --> W3["Step 3: Synthesize Patch"]
+    end
+
+    subgraph Agent["Autonomous Agent (Stochastic Control Flow)"]
+        A1["LLM Orchestrator"] --> A2{"Action Policy"}
+        A2 -->|Branch A| Act1["Execute SQL"]
+        A2 -->|Branch B| Act2["Run Bash"]
+        A2 -->|Branch C| Act3["Inspect Logs"]
+        Act1 --> A1
+        Act2 --> A1
+        Act3 --> A1
+    end
+
+    style Workflow fill:#c8e6c9,stroke:#1b5e20
+    style Agent fill:#fff9c4,stroke:#fbc02d
+```
+
+### The Architectural Decision Matrix
+
+| Dimension | Deterministic Workflow | Autonomous Agent |
+|---|---|---|
+| **Control Flow** | Hardcoded by systems engineers (DAG) | Dynamically routed by the model |
+| **Execution Reliability** | High ($> 99\%$ reproducibility) | Stochastic ($70\%–90\%$ baseline convergence) |
+| **Observability** | Linear trace telemetry | Multi-turn branching trajectories |
+| **Optimal Domain** | ETL pipelines, standard document QA | Open-ended codebase exploration, security auditing |
+
+**Production Rule of Thumb**: If you can draw the end-to-end task as a deterministic flowchart, build a **Workflow**. Reserve **Autonomous Agents** exclusively for open-ended problem topologies where the next action cannot be statically predicted.
+
+---
+
+## 11.8 Production Agent Architectural Patterns
+
+```mermaid
+flowchart TD
+    Req["Incoming Workload Specification"] --> Q1{"Is Execution Flow Statically Determinable?"}
+
+    Q1 -->|Yes| P1["Deterministic DAG Workflow<br/>(Sequential Chaining / Map-Reduce)"]
+    Q1 -->|No, Finite Intent Classes| P2["Router Pattern<br/>(LLM Classifier Dispatches to Fixed Workflows)"]
+    Q1 -->|No, Open Exploration| Q2{"Expected Trajectory Horizon?"}
+
+    Q2 -->|Short (< 8 Tool Steps)| P3["ReAct Loop<br/>(Single-Agent Tool Interleaving)"]
+    Q2 -->|Medium (10–30 Steps)| P4["Decoupled Plan-and-Execute<br/>(Hierarchical Planner + Execution Workers)"]
+    Q2 -->|Extensive + Parallelizable| P5["Orchestrator-Workers<br/>(Dynamic Partitioning across Parallel Nodes)"]
+
+    style P1 fill:#c8e6c9,stroke:#1b5e20
+    style P2 fill:#c8e6c9,stroke:#1b5e20
+    style P3 fill:#fff9c4,stroke:#fbc02d
+    style P4 fill:#bbdefb,stroke:#0d47a1
+    style P5 fill:#f8bbd0,stroke:#880e4f
+```
+
+### The Five Canonical Patterns
+
+1. **Router**: Classifies user intent and routes execution to specialized downstream pipelines.
+2. **ReAct Tool-Augmented LLM**: Single-turn loop interleaving thoughts and actions for localized problem solving.
+3. **Plan-and-Solve**: Upfront generation of a declarative execution plan, executed linearly with assertion gates.
+4. **Orchestrator-Workers**: Central coordinator partitions an open-ended objective into parallel sub-tasks dispatched to stateless worker LLMs.
+5. **Reflexive Evaluator**: Integrates an adversarial Critic and environment assertions to iteratively refine draft outputs.
+
+---
+
+## 11.9 Enterprise Production Readiness Checklist
+
+Deploying autonomous agents into enterprise production requires strict systems engineering controls:
+
+### Tool Interface Design
+- [ ] Tool schemas are defined via strict Pydantic JSON specifications (no unvalidated free text).
+- [ ] Tool descriptions explicitly state trigger preconditions, parameter invariants, and side effects.
+- [ ] Host errors return structured, actionable remediation feedback to the agent.
+- [ ] High-blast-radius operations require interactive MFA confirmation tokens.
+
+### Control Flow and Loop Safety
+- [ ] Hard maximum step limit enforced ($H \le 15$).
+- [ ] Duplicate action detection aborts cyclical execution loops.
+- [ ] Strict per-tool and end-to-end execution timeout floors.
+- [ ] Graceful terminal failure states allowing the agent to emit an explicit refusal.
+
+### Security and Sandboxing
+- [ ] Code execution occurs inside isolated, ephemeral container environments with zero host network access.
+- [ ] Tool outputs are sanitized to neutralize indirect prompt injection payloads.
+- [ ] Least-privilege access tokens provisioned per invocation.
+- [ ] Complete immutable audit logging of every tool payload and parameter set.
+
+---
+
+## 11.10 The Simplicity Axiom: Why Minimalist Architectures Prevail
+
+Complex agent architectures fail not because foundation models lack intelligence, but because **stochastic complexity compounds exponentially across multi-step execution graphs**:
+
+$$\mathcal{P}(\text{Success}) = \prod_{t=1}^{H} \mathcal{P}(\text{Step } t \text{ Valid})$$
+
+If an agent requires 20 autonomous steps and each individual decision maintains a 95% success rate, the end-to-end convergence probability is only $0.95^{20} \approx 35.8\%$.
+
+By constraining tool registries, shortening execution horizons, and replacing stochastic agent loops with deterministic workflow DAGs wherever possible, systems architects achieve rock-solid production reliability.
+
+---
+
+## Chapter Summary
+
+```mermaid
+graph TB
+    A["Autonomous Agent Foundations"] --> B["Token Space Projection<br/>Tools project external world states into the KV cache"]
+    A --> C["The Lookahead Dilemma<br/>Autoregressive models take irrevocable actions without mental simulation"]
+    A --> D["Reflexion Metacognition<br/>Isolated critics evaluate traces against deterministic assertions"]
+    A --> E["Workflow vs. Agent Discipline<br/>Prioritize deterministic DAGs over stochastic swarms"]
+```
+
+Core takeaways:
+
+1. **Agents project reality into token space**: Tool invocation is the mechanism by which non-stationary environmental states become text tokens that condition the forward pass.
+2. **ReAct enforces virtual depth**: Emitting an explicit `Thought` block prior to `Action` routing expands effective computational capacity.
+3. **Autoregression lacks native lookahead**: Compensate for missing tree search via upfront Plan-and-Execute separation and Human-in-the-Loop authorization gates.
+4. **Isolate the Critic in Reflexion loops**: Prevent cognitive rationalization by running self-evaluation in separate contexts against programmatic assertions.
+5. **Default to deterministic workflows**: 90% of enterprise requirements are solved more reliably by hardcoded DAG workflows than by autonomous multi-agent swarms.
+
+In Chapter 12, we address the ultimate prerequisite for enterprise deployment: how to build rigorous, automated evaluation pipelines for generative AI systems.
 
 ---
 
 ## Further Reading
 
-- [Yao et al., 2022: _ReAct: Synergizing Reasoning and Acting_](https://arxiv.org/abs/2210.03629) - the pioneering work behind the ReAct paradigm
-- [Shinn et al., 2023: _Reflexion_](https://arxiv.org/abs/2303.11366) - reflection-based agents
-- [Schick et al., 2023: _Toolformer_](https://arxiv.org/abs/2302.04761) - teaching models to use tools
-- [Anthropic, 2024: _Building Effective Agents_](https://www.anthropic.com/research/building-effective-agents) - an engineering guide against overcomplication
-- [Wang et al., 2023: _Voyager: An Open-Ended Embodied Agent with LLMs_](https://arxiv.org/abs/2305.16291) - exploration of long-term agents
-- [Park et al., 2023: _Generative Agents_](https://arxiv.org/abs/2304.03442) - agents that simulate human behavior
-- [Liu et al., 2023: _AgentBench_](https://arxiv.org/abs/2308.03688) - an agent evaluation benchmark
+- [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629) — Yao et al., Princeton & Google Research, 2022
+- [Reflexion: Language Agents with Verbal Reinforcement Learning](https://arxiv.org/abs/2303.11366) — Shinn et al., Northeastern & MIT, 2023
+- [Toolformer: Language Models Can Teach Themselves to Use Tools](https://arxiv.org/abs/2302.04761) — Schick et al., Meta AI, 2023
+- [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) — Anthropic Engineering, 2024
+- [Voyager: An Open-Ended Embodied Agent with Large Language Models](https://arxiv.org/abs/2305.16291) — Wang et al., 2023
+- [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442) — Park et al., Stanford University, 2023
+- [AgentBench: Evaluating LLMs as Agents](https://arxiv.org/abs/2308.03688) — Liu et al., Tsinghua University, 2023
 
 [← Previous Chapter](10-knowledge.md) | [Table of Contents](../README.md) | [Next Chapter →](12-evaluation.md)

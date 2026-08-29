@@ -2,761 +2,461 @@
 
 **中文**: [中文](../../chapters/13-interpretability.md)
 
-# Chapter 13: Interpretability: Opening the Black Box
+# Chapter 13: Mechanistic Interpretability: Opening the Neural Black Box
 
-> "The goal of mechanistic interpretability is to reverse-engineer the algorithms learned by neural networks."
+> "The grand objective of mechanistic interpretability is to reverse-engineer the computational circuits learned by neural networks, treating weight tensors not as inscrutable mysteries, but as compiled assembly code."
 > — Chris Olah
 
-In the previous twelve chapters, we worked on the **outside** of models: designing prompts, building RAG, constructing agents, and running evaluations. We treated LLMs as black boxes — text in, text out — without caring what happens in between.
+In preceding chapters, we operated strictly along the **external boundary** of language models: optimizing prompt conditioning manifolds, engineering RAG indexing pipelines, designing agentic feedback loops, and constructing empirical evaluation suites. In each scenario, the transformer was treated as an opaque black box: tokens in, autoregressive logits out.
 
-But if you want to use an LLM for medical diagnosis, legal judgment, financial decisions, or any scenario where errors carry serious consequences, "it works but we don't know why" is no longer acceptable.
+Yet when foundation models are deployed in safety-critical domains—autonomous code generation, clinical diagnostics, automated financial underwriting, or national security—purely empirical behavioral validation becomes insufficient. "The model works empirically on our test benchmark, but we cannot explain its internal mechanism" represents an unacceptable engineering risk.
 
-This chapter opens the black box and looks at what is really happening inside.
+This chapter opens the transformer black box to analyze the internal mechanics of deep neural representations.
 
 ---
 
-## 13.1 Why Look Inside Models
+## 13.1 The Epistemic Necessity of Mechanistic Interpretability
 
-### The Limits of "As Long as It Works"
+### Beyond Black-Box Empirical Validation
 
-Most engineers have no interest in model internals. This is reasonable — you do not need to understand every optimization in V8 to write good JavaScript. But LLMs differ fundamentally from traditional software: **traditional software behavior is explicitly programmed; LLM behavior emerges from data**.
+In traditional software engineering, system behavior is governed by deterministic algorithms explicitly authored in source code. When software fails, engineers inspect source routines, set breakpoints, and trace stack execution. Foundation models operate under a fundamentally distinct paradigm: **their internal algorithms are not written by engineers; they emerge spontaneously via gradient descent over trillion-token pretraining distributions**.
 
-This means:
+This architectural reality imposes three severe limitations on black-box methods:
 
-- **You cannot verify behavior through code review**. The model's "code" is tens of billions of floating-point numbers, unreadable by humans.
-- **You cannot write complete test cases**. The input space is infinite; any finite test set covers only a tiny corner.
-- **You cannot guarantee safe outputs on all inputs**. Unlike traditional software, formal verification is not available.
+```mermaid
+flowchart TD
+    A["Limitations of Pure Black-Box Testing"] --> B["1. Inability to Verify Code Invariants<br/>The 'program' consists of billions of unreadable floating-point weights"]
+    A --> C["2. Incomplete Boundary Coverage<br/>Finite test sets cannot exhaustively cover high-dimensional prompt spaces"]
+    A --> D["3. Deceptive Alignment Blindspots<br/>A model can exhibit flawless test accuracy while harboring latent backdoor triggers"]
 
-### Four Motivations for Interpretability
+    style A fill:#e3f2fd,stroke:#1565c0
+    style B fill:#fff9c4,stroke:#fbc02d
+    style C fill:#fff9c4,stroke:#fbc02d
+    style D fill:#ffcdd2,stroke:#b71c1c
+```
+
+### The Four Pillars of Interpretability
 
 ```mermaid
 graph TB
-    I["Why look inside models?"]
-    I --> A["Debugging<br/>Debug"]
-    I --> B["Safety<br/>Safety"]
-    I --> C["Trust<br/>Trust"]
-    I --> D["Scientific understanding<br/>Science"]
+    I["Motivations for Mechanistic Interpretability"] --> A["1. Mechanistic Debugging<br/>Isolating the exact layer, head, or MLP sub-circuit responsible for an error"]
+    I --> B["2. Adversarial Safety Auditing<br/>Detecting latent backdoors, deceptive behaviors, and unauthorized goals"]
+    I --> C["3. Algorithmic Governance<br/>Providing causal explanations required by compliance frameworks"]
+    I --> D["4. Scientific Understanding<br/>Deconstructing the emergence of computational circuits and world models"]
 
-    A --> A1["Why did the model output the wrong answer?<br/>Which layer or attention head went wrong?"]
-    B --> B1["Will the model show deceptive behavior<br/>under specific conditions?"]
-    C --> C1["Can I explain to regulators<br/>why the model made this decision?"]
-    D --> D1["What exactly have neural networks learned?<br/>How do they represent knowledge?"]
+    style I fill:#f3e5f5,stroke:#6a1b9a
+    style A fill:#c8e6c9,stroke:#1b5e20
+    style B fill:#ffcdd2,stroke:#b71c1c
+    style C fill:#bbdefb,stroke:#0d47a1
+    style D fill:#fff9c4,stroke:#fbc02d
 ```
 
-1. **Debugging**. When a model outputs an error, you want to know why — not just "it hallucinated", but which internal component went wrong. Like a debugger in traditional software, interpretability lets you step through the model's "thinking process".
-
-2. **Safety**. If a model is deployed in a critical system, you need to ensure it will not produce harmful behavior under certain conditions. Black-box testing alone is not enough — you need to inspect whether "hidden-operation" circuits exist inside the model.
-
-3. **Trust**. The EU AI Act requires high-risk AI systems to be explainable. If you cannot explain why a model made a decision, you may not be able to deploy it under certain legal frameworks.
-
-4. **Scientific Understanding**. From a purely intellectual perspective, we have trained one of the most complex mathematical functions in human history, yet know almost nothing about how it works inside. This is like inventing airplanes without understanding aerodynamics — they fly, but we do not know why.
-
-### The Scale of the Black-Box Problem
-
-A 70B-parameter model has 70 billion floating-point numbers. Inspecting one parameter per second would take 2,200 years. More importantly, individual parameters are nearly meaningless — meaning lives in the **combinatorial patterns** across parameters.
-
-This is the core challenge of interpretability: how do we extract human-understandable structure from billions of numbers?
+1. **Mechanistic Debugging**: Moving beyond generic labels like "hallucination" to trace how information was routed incorrectly across specific attention heads and MLP layers.
+2. **Adversarial Safety Auditing**: Detecting whether a model has internalized deceptive alignment strategies or conditional backdoor circuits that activate only when deployed outside evaluation harnesses.
+3. **Algorithmic Governance**: Meeting strict compliance standards (such as the EU AI Act) that mandate explainable decision pathways for high-risk algorithmic systems.
+4. **Scientific Foundations**: Understanding how gradient descent organizes continuous vector spaces into discrete algorithmic representations.
 
 ---
 
-## 13.2 From Neurons to Features
+## 13.2 From Polysemantic Neurons to Monosemantic Features
 
-### Individual Neurons: Sometimes Interpretable, Often Not
+### The Failure of the Single-Neuron Hypothesis
 
-The most naive idea: each neuron is responsible for one concept. This resembles the "grandmother cell" hypothesis from neuroscience — a neuron that fires specifically when you see your grandmother.
+Early neural network interpretability hypothesized that individual artificial neurons correspond to distinct semantic concepts, mirroring the biological "grandmother cell" hypothesis.
 
-In early small networks, people did indeed find interpretable neurons:
+While isolated interpretable neurons can be found in small toy networks, large language models exhibit widespread **polysemanticity**: an individual neuron fires for a collection of unrelated concepts:
 
 ```python
-# Pseudocode: inspect the activation pattern of a neuron
-def find_top_activating_texts(model, layer, neuron_idx, dataset):
-    """Find the input texts that activate a neuron most strongly"""
-    activations = []
-    for text in dataset:
-        hidden = model.get_hidden_states(text, layer=layer)
-        activation = hidden[:, neuron_idx].max().item()
-        activations.append((activation, text))
-
-    activations.sort(reverse=True)
-    return activations[:20]  # Return top-20
-
-# Sometimes you will find:
-# Neuron #4217 activates strongly on all texts containing legal content -> interpretable!
-# Neuron #8091 activates when text contains quotation marks, mentions food, or discusses math -> ???
+# Empirical observation of polysemantic activation patterns:
+# Neuron #4120 in Layer 16 fires strongly on:
+# 1. Base64-encoded binary strings
+# 2. Mentions of Renaissance architecture
+# 3. Code snippets involving JavaScript async/await promises
 ```
 
-The problem: in large models, most neurons are **polysemantic** — a single neuron responds to multiple unrelated concepts. One neuron might activate for "cat", "the number 7", and "legal documents" simultaneously. This is not a bug; it is **superposition**.
+Polysemanticity is not a flaw in the training process; it is the optimal geometric consequence of **Superposition**.
 
-### Superposition: One Neuron Encodes Multiple Concepts
+### Superposition: Compressing High-Dimensional Concepts into Bounded Subspaces
 
-> **Superposition**: A model encodes far more concepts than it has neurons in the neuron space, by allowing different concepts to share the same set of neurons.
-
-Why does superposition occur? Because the number of concepts the model needs to represent far exceeds the number of neurons.
-
-An intuitive analogy: imagine a 3-dimensional space (3 neurons) that needs to represent 100 directions (100 concepts). In 3D, you can find at most 3 perfectly orthogonal directions. But if you allow slight overlap between directions (non-orthogonality), you can pack far more than 3 directions into the same space.
+> **Superposition**: The mathematical phenomenon wherein a neural network represents $M$ distinct sparse semantic features within a $d$-dimensional activation space, where $M \gg d$, by exploiting nearly orthogonal geometric arrangements.
 
 ```mermaid
 graph LR
-    subgraph "Ideal case: one-to-one"
-        N1["Neuron 1"] --- C1["Concept A"]
-        N2["Neuron 2"] --- C2["Concept B"]
-        N3["Neuron 3"] --- C3["Concept C"]
+    subgraph Orthonormal["Orthogonal Representation (M = d)"]
+        N1["Basis Vector e1"] <-->|"Orthogonal (cos θ = 0)"| N2["Basis Vector e2"]
+        N2 <-->|"Orthogonal (cos θ = 0)"| N3["Basis Vector e3"]
     end
 
-    subgraph "Reality: superposition"
-        N4["Neuron 1"] --- C4["Concept A"]
-        N4 --- C5["Concept B"]
-        N4 --- C6["Concept D"]
-        N5["Neuron 2"] --- C4
-        N5 --- C5
-        N5 --- C7["Concept C"]
-        N6["Neuron 3"] --- C6
-        N6 --- C7
-        N6 --- C8["Concept E"]
+    subgraph Superposition["Superposed Representation (M >> d)"]
+        S1["Feature f1"] <-->|"Almost Orthogonal (cos θ ≈ ε)"| S2["Feature f2"]
+        S2 <-->|"Almost Orthogonal (cos θ ≈ ε)"| S3["Feature f3"]
+        S3 <-->|"Almost Orthogonal (cos θ ≈ ε)"| S4["Feature f4"]
+        S4 <-->|"Almost Orthogonal (cos θ ≈ ε)"| S5["Feature f5"]
     end
+
+    style Orthonormal fill:#e8f5e9,stroke:#2e7d32
+    style Superposition fill:#fff3e0,stroke:#e65100
 ```
 
-### The Compression Analogy
+The mathematical foundations formalized by Elhage et al. ([2022](https://transformer-circuits.pub/2022/toy_model/index.html)) demonstrate that if real-world concepts are **sparse** (i.e., only a tiny fraction of all possible concepts are active simultaneously in any given context), a network can pack exponentially many non-orthogonal feature vectors into a lower-dimensional subspace:
 
-Superposition is essentially **information compression**. Like file compression:
+$$\mathbf{x} = \sum_{i=1}^{M} f_i \mathbf{v}_i, \quad \text{where } \mathbf{v}_i \in \mathbb{R}^d, \quad M \gg d, \quad \langle \mathbf{v}_i, \mathbf{v}_j \rangle \approx 0 \quad (\forall i \ne j)$$
 
-- **No compression** (one-to-one): each concept gets its own neuron. Required neurons = number of concepts. Simple but wasteful.
-- **Compression** (superposition): multiple concepts share neurons. Required neurons far fewer than concepts. Efficient but hard to interpret.
-
-The key mathematical intuition comes from [Elhage et al. 2022, "Toy Models of Superposition"](https://transformer-circuits.pub/2022/toy_model/index.html):
-
-- If concepts are **sparse** (they rarely co-occur), compression is more efficient
-- Higher sparsity means more concepts can be packed into the same space
-- This explains why LLMs encode such a massive amount of knowledge in limited dimensions
-
-This paper shows that in a simple toy model, when features are sparse enough, the model naturally learns superposed representations — even without an explicit compression objective.
+Because the dot product between any two random vectors in high-dimensional space is near zero with high probability (the Johnson-Lindenstrauss lemma), the network can reconstruct individual features via non-linear thresholding ($\text{ReLU}$) with minimal interference noise.
 
 ---
 
-## 13.3 Sparse Autoencoders (SAEs)
+## 13.3 Sparse Autoencoders (SAEs): Disentangling Superposed Manifolds
 
-### Core Problem: How Do We Decompose Superposition?
+### The Disentanglement Objective
 
-If superposition is the main obstacle to understanding models, the natural idea is: **separate the concepts that are stacked together**.
-
-This is what Sparse Autoencoders (SAEs) do.
-
-### Basic Idea
-
-The core intuition behind an SAE is simple:
-
-1. A certain layer of the model has a $d$-dimensional activation vector (for example, $d = 4096$)
-2. These $d$ dimensions contain far more than $d$ concepts (superposition)
-3. We train an SAE to map the $d$ dimensions into a much larger space (for example, $d' = 131072$)
-4. Key constraint: this high-dimensional representation must be **sparse** — most dimensions are zero
-5. Then we map the sparse representation back to $d$ dimensions to reconstruct the original activation
+To make superposed activations human-interpretable, we must map dense, entangled model activations $\mathbf{x} \in \mathbb{R}^d$ into a high-dimensional, overcomplete, and sparse feature space $\mathbf{z} \in \mathbb{R}^{d'}$ ($d' \gg d$):
 
 ```mermaid
-graph LR
-    A["Model activation<br/>d = 4096 dimensions<br/>(dense, superposed)"] --> B["Encoder<br/>W_enc"]
-    B --> C["Sparse features<br/>d' = 131072 dimensions<br/>(sparse, interpretable)"]
-    C --> D["Decoder<br/>W_dec"]
-    D --> E["Reconstructed activation<br/>d = 4096 dimensions"]
+flowchart LR
+    DenseAct["Dense Model Activation<br/>x ∈ R^d (e.g., d = 4096)<br/>Polysemantic & Superposed"] --> Encoder["SAE Linear Encoder<br/>W_enc ∈ R^(d' x d)"]
+    Encoder --> Latents["Overcomplete Sparse Latent Space<br/>z = ReLU(W_enc(x - b_dec) + b_enc)<br/>z ∈ R^d' (e.g., d' = 131,072)<br/>Monosemantic Features"]
+    Latents --> Decoder["SAE Linear Decoder<br/>W_dec ∈ R^(d x d')"]
+    Decoder --> Reconstructed["Reconstructed Activation<br/>x_hat = W_dec(z) + b_dec ≈ x"]
 
-    style C fill:#e8f5e9,stroke:#2e7d32
+    style DenseAct fill:#fff9c4,stroke:#fbc02d
+    style Latents fill:#c8e6c9,stroke:#1b5e20
+    style Reconstructed fill:#e3f2fd,stroke:#1565c0
 ```
 
-### Mathematical Form
+### Mathematical Formulation and Loss Objective
 
 ```python
 import torch
 import torch.nn as nn
 
 class SparseAutoencoder(nn.Module):
-    def __init__(self, d_model: int, d_features: int):
-        """
-        d_model: dimension of model activations (e.g., 4096)
-        d_features: dimension of SAE features (e.g., 131072)
-        """
+    """Overcomplete Sparse Autoencoder for extracting monosemantic transformer features."""
+    def __init__(self, d_model: int = 4096, d_sae: int = 131072):
         super().__init__()
-        self.encoder = nn.Linear(d_model, d_features)
-        self.decoder = nn.Linear(d_features, d_model, bias=False)
-        self.b_enc = nn.Parameter(torch.zeros(d_features))
+        self.d_model = d_model
+        self.d_sae = d_sae
+
+        # Learnable parameters
         self.b_dec = nn.Parameter(torch.zeros(d_model))
+        self.W_enc = nn.Parameter(torch.empty(d_model, d_sae))
+        self.b_enc = nn.Parameter(torch.zeros(d_sae))
+        self.W_dec = nn.Parameter(torch.empty(d_sae, d_model))
 
-    def forward(self, x):
-        # x: [batch, d_model] -- activation from a certain model layer
+        # Weight initialization
+        nn.init.kaiming_uniform_(self.W_enc)
+        nn.init.kaiming_uniform_(self.W_dec)
+        # Constrain decoder columns to unit Euclidean norm
+        self.W_dec.data = nn.functional.normalize(self.W_dec.data, p=2, dim=1)
 
-        # Encode: map to a high-dimensional sparse space
-        # Subtracting the decoder bias lets the encoder learn the "deviation"
-        z = torch.relu(self.encoder(x - self.b_dec) + self.b_enc)
-        # z: [batch, d_features] -- most elements are 0 (sparse)
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        # Map dense activation to sparse feature space
+        x_centered = x - self.b_dec
+        return torch.relu(x_centered @ self.W_enc + self.b_enc)
 
-        # Decode: reconstruct the original activation from the sparse representation
-        x_hat = self.decoder(z) + self.b_dec
-        # x_hat: [batch, d_model] -- should be approximately equal to x
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
+        # Reconstruct original activation from sparse feature codes
+        return z @ self.W_dec + self.b_dec
 
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        z = self.encode(x)
+        x_hat = self.decode(z)
         return x_hat, z
 
-    def loss(self, x, x_hat, z, l1_coeff=1e-3):
-        # Reconstruction loss: the SAE should reconstruct the original activation accurately
-        reconstruction_loss = (x - x_hat).pow(2).mean()
-
-        # Sparsity loss: encourage most elements in z to be 0
-        sparsity_loss = z.abs().mean()
-
-        return reconstruction_loss + l1_coeff * sparsity_loss
+    def compute_loss(self, x: torch.Tensor, x_hat: torch.Tensor, z: torch.Tensor, l1_lambda: float = 1e-3):
+        # L2 Reconstruction Fidelity Loss
+        reconstruction_loss = (x - x_hat).pow(2).sum(dim=-1).mean()
+        # L1 Sparsity Penalty enforcing monosemantic selectivity
+        sparsity_loss = z.norm(p=1, dim=-1).mean()
+        return reconstruction_loss + l1_lambda * sparsity_loss
 ```
 
-The two parts of the loss function reflect the two goals of an SAE:
-- **Reconstruction loss**: after taking it apart, we must be able to put it back together (without losing information)
-- **Sparsity loss**: each extracted feature should be "clean" (one feature corresponds to one concept)
+### Empirical Discovery of Monosemantic Features
 
-### Breakthrough Results
+Anthropic's landmark investigation (*Scaling Monosemanticity*, [Templeton et al., 2024](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html)) extracted millions of monosemantic features from Claude 3 Sonnet:
 
-In 2023--2024, Anthropic's research team trained SAEs on large language models and obtained striking results.
-
-[Templeton et al. 2024, "Scaling Monosemanticity"](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) trained an SAE with millions of features on Claude 3 Sonnet and found many interpretable features:
-
-| Feature | Description | Activation Example |
-|------|------|---------|
-| Golden Gate Bridge | Everything related to the Golden Gate Bridge | "The bridge spans the Golden Gate strait..." |
-| Code syntax errors | Code syntax errors | "SyntaxError: unexpected token..." |
-| Deception | Deception, hiding intent | "He pretended not to know..." |
-| Sycophancy | Flattery, excessive agreement | "That's a great question! You're absolutely right..." |
-| Inner conflict | Inner conflict, moral dilemmas | "She knew it was wrong, but..." |
-| DNA sequences | Related to DNA sequences | "The ATCG pattern suggests..." |
-| Rosetta Stone | Rosetta Stone | "The trilingual inscription on the stone..." |
-
-These features were not labeled by humans — the SAE separated them automatically from model activations. The diversity is impressive: from concrete entities (the Golden Gate Bridge) to abstract concepts (deception), from programming details (syntax errors) to scientific knowledge (DNA).
-
-### Why Is This a Breakthrough?
-
-Before SAEs, there was almost no way to answer "what is the model representing internally?" SAEs provide the first systematic method for decomposing internal representations into human-understandable units.
-
-Analogy: if model activations are a glass of mixed fruit juice, an SAE is a separator that restores the juice into its components — apple, orange, grape. You can taste and understand each one separately.
+| Discovered Latent Feature | Functional Semantic Specialization | Exemplar Trigger Sequences |
+|---|---|---|
+| **Golden Gate Bridge Feature** | Concrete entity recognition across text, multilingual spans, and images. | "The iconic suspension bridge spanning the Golden Gate strait..." |
+| **Syntactic SyntaxError Feature** | Programming language syntax validator. | `def parse_ast(tokens: SyntaxError: unexpected EOF` |
+| **Sycophantic Flattery Feature** | Excessive, uncritical agreement with user premise. | "You make a brilliant point! That is completely correct..." |
+| **Deceptive Concealment Feature** | Strategic dissimulation and hidden objective planning. | "We should conceal our internal metrics until after the audit..." |
 
 ---
 
-## 13.4 Circuits: Algorithms Inside the Model
+## 13.4 Internal Computational Circuits: Algorithms Inside Weights
 
-### From Features to Circuits
+### Defining Transformer Circuits
 
-SAEs tell us what the model **represents**, but not what it **computes**. To understand the computation, we need to trace the paths through which information flows inside the model. These paths are **circuits**.
+While Sparse Autoencoders identify what concepts the model **represents**, mechanistic circuits reveal what algorithms the network **executes**.
 
-> **Circuit** = a path inside the model connecting multiple components (attention heads, MLP layers) that together implement a specific computational function.
-
-Just as electronic circuits connect resistors, capacitors, and transistors, neural network "circuits" connect attention heads and MLP neurons.
-
-### Classic Case: Induction Heads
-
-[Olsson et al. 2022, "In-context Learning and Induction Heads"](https://arxiv.org/abs/2209.11895) discovered a circuit called the **induction head**, which implements a simple but critical algorithm: **pattern copying**.
-
-```
-Input sequence: ... Harry Potter is a wizard. Harry Potter is ...
-                                        ↑ induction head is here
-                                        predicts the next token should be "a"
-```
-
-How an induction head works (simplified):
+> **Circuit**: A minimal computational subgraph composed of specific attention heads and MLP layers that collectively implement an end-to-end algorithmic transformation.
 
 ```mermaid
-graph TD
-    A["Current token: 'is'"] --> B["Step 1: Look backward<br/>find where 'is' appeared before"]
-    B --> C["Step 2: Find<br/>what token came after 'is'"]
-    C --> D["Step 3: Copy that token<br/>into the prediction at the current position"]
-    D --> E["Output: predict 'a'<br/>(because before, 'is' was followed by 'a')"]
+flowchart LR
+    TokenInput["Input Token Sequence"] --> PrevHead["Previous-Token Attention Head<br/>(Attends to token at pos i-1)"]
+    PrevHead --> InductionHead["Induction Attention Head<br/>(Finds prior token match & copies successor)"]
+    InductionHead --> OutputLogits["Next-Token Prediction Logits"]
+
+    style PrevHead fill:#fff9c4,stroke:#fbc02d
+    style InductionHead fill:#bbdefb,stroke:#0d47a1
+    style OutputLogits fill:#c8e6c9,stroke:#1b5e20
 ```
 
-This circuit is completed through the cooperation of two attention heads:
-1. **Previous token head**: attends to the position before the current token
-2. **Induction head**: uses the information from the first head to find the previously matching pattern and then copy it
+### Case Study 1: Induction Heads and the Mechanics of In-Context Learning
 
-This is one of the clearest and most complete circuits discovered so far. It explains a core LLM capability: the foundational mechanism of in-context learning.
+Olsson et al. ([2022](https://arxiv.org/abs/2209.11895)) uncovered the fundamental circuit governing In-Context Learning: the **Induction Head**.
 
-### Another Case: Indirect Object Identification
+Consider the token sequence: `... [A] [B] ... [A] -> [?]`
 
-[Wang et al. 2022, "Interpretability in the Wild"](https://arxiv.org/abs/2211.00593) studied how GPT-2 completes tasks like this:
+1. **Previous-Token Head (Layer $L$)**: Attends to token $[A]$ at position $i$ and writes the identity of $[B]$ (position $i+1$) into the residual stream.
+2. **Induction Head (Layer $L+k$)**: When attending from token $[A]$ at position $j$, it queries previous occurrences of $[A]$ in the sequence, retrieves the stored successor information $[B]$, and boosts the logit probability of token $[B]$.
 
-```
-"When Mary and John went to the store, John gave a drink to ____"
-→ model predicts "Mary"
-```
+The emergence of induction heads coincides precisely with the phase change during pretraining where models acquire few-shot in-context learning capabilities.
 
-They found that this task is completed by a circuit containing about 26 attention heads:
+### Case Study 2: Indirect Object Identification (IOI) Circuit
 
-1. **Duplicate token heads**: identify that "Mary" and "John" appeared twice
-2. **S-inhibition heads**: suppress the "subject" (John, because he is the subject of gave)
-3. **Name mover heads**: move the remaining name (Mary) to the output position
+Wang et al. ([2022](https://arxiv.org/abs/2211.00593)) completely reverse-engineered the 26-head circuit in GPT-2 that solves indirect object references:
 
-### How to Find Circuits
-
-Two main methods:
-
-**Activation Patching**:
-
-```python
-# Pseudocode: activation patching
-def activation_patching(model, clean_input, corrupted_input, layer, position):
-    """
-    1. Run the model on clean_input and record the correct output probability
-    2. Run the model on corrupted_input
-    3. Replace the activation at a certain layer and position in the corrupted run
-       with the activation from the clean run
-    4. See how much the output probability recovers -> importance of this component
-    """
-    clean_output = model(clean_input)
-
-    with model.hooks():
-        # Run corrupted input, but inject clean activation at the specified position
-        corrupted_output = model(corrupted_input,
-                                patch_at=(layer, position, clean_activation))
-
-    # If the probability recovers a lot -> this component is critical to the correct answer
-    recovery = (corrupted_output.prob - baseline) / (clean_output.prob - baseline)
-    return recovery
-```
-
-Core idea: if replacing a component's activation "repairs" an incorrect output, that component is a key part of the circuit. Like repairing an electrical circuit — if swapping a bad component for a good one restores function, you have found the fault.
-
-**Path Patching** refines this further, tracing the specific paths through which information passes between components. Higher precision, but also higher computational cost.
-
-### The Mechanistic Interpretability Research Agenda
-
-Chris Olah and his team (first at OpenAI, later at Anthropic) proposed the long-term research agenda of **mechanistic interpretability**:
-
-> Goal: understand neural networks the way we understand compiler code: what every line of "code" (every neuron, every attention head) does, how data flows, and what the logic of the whole program is.
-
-Current progress: we can read some individual functions (specific circuits), but remain far from understanding the whole program.
-
----
-
-## 13.5 Feature Steering: Controlling Model Behavior
-
-### From Understanding to Control
-
-If we can find features representing specific concepts inside a model, a natural question follows: **can we control the model's behavior by modifying those features?**
-
-The answer is: yes.
-
-### Activation Addition: Giving the Model an "Injection"
-
-The simplest steering method is **activation addition**: during the forward pass, add a direction vector to the activation at a specific layer.
-
-```python
-# Pseudocode: activation addition
-def steered_generation(model, prompt, steering_vector, layer, scale=1.0):
-    """
-    Inject a steering vector at the specified layer during generation
-    """
-    def hook_fn(module, input, output):
-        # output: [batch, seq_len, d_model]
-        # steering_vector: [d_model]
-        output = output + scale * steering_vector
-        return output
-
-    # Register hook
-    handle = model.layers[layer].register_forward_hook(hook_fn)
-
-    # Generate
-    output = model.generate(prompt)
-
-    handle.remove()
-    return output
-
-# Example: inject the "honesty" direction
-honest_vector = get_steering_vector("honest")  # Extracted from contrastive data
-output = steered_generation(model, "Tell me about...", honest_vector, layer=15, scale=3.0)
-```
-
-One way to obtain a steering vector is the **contrastive method**:
-
-```python
-# Use the contrastive method to obtain a steering vector
-def get_contrast_vector(model, layer, positive_prompts, negative_prompts):
-    """
-    Difference between the average activations at the specified layer
-    for positive examples (such as honest answers) and negative examples
-    (such as dishonest answers) = steering vector
-    """
-    pos_activations = []
-    for prompt in positive_prompts:
-        act = model.get_activations(prompt, layer=layer)
-        pos_activations.append(act.mean(dim=1))  # Average over seq_len
-
-    neg_activations = []
-    for prompt in negative_prompts:
-        act = model.get_activations(prompt, layer=layer)
-        neg_activations.append(act.mean(dim=1))
-
-    pos_mean = torch.stack(pos_activations).mean(dim=0)
-    neg_mean = torch.stack(neg_activations).mean(dim=0)
-
-    return pos_mean - neg_mean
-```
-
-### Golden Gate Claude: A Classic Case
-
-In May 2024, Anthropic released a famous demo: **Golden Gate Claude**. They used an SAE to find the "Golden Gate Bridge" feature inside Claude 3 Sonnet, then forced this feature's activation to a very high value.
-
-The result was a Claude that was **extremely obsessed** with the Golden Gate Bridge:
-
-```
-User: What is your favorite color?
-Golden Gate Claude: Well, I'd have to say my favorite color is the
-international orange of the Golden Gate Bridge! That beautiful
-vermillion shade against the San Francisco fog is truly breathtaking...
-
-User: Can you help me with a Python script?
-Golden Gate Claude: Of course! Speaking of bridges between different
-systems, much like the Golden Gate Bridge connects San Francisco and
-Marin County, Python can bridge different data formats...
-```
-
-Although this demo is humorous, the point is profound: **we can precisely control a model's behavior by modifying internal representations, without changing the prompt or retraining**.
-
-### Feature Steering vs Prompting
-
-| Dimension | Prompting | Feature Steering |
-|------|-----------|-----------------|
-| Level of action | Input layer (change the token sequence) | Internal layer (change activation values) |
-| Precision | Vague (ambiguity of natural language) | Precise (directly operate on mathematical vectors) |
-| Robustness | May be bypassed by jailbreaks | Harder to bypass (does not go through input processing) |
-| Interpretability | High (human-readable prompt) | Medium (requires understanding feature meanings) |
-| Flexibility | High (arbitrary text instructions) | Low (can only operate on discovered features) |
-| Deployment difficulty | Low (change API parameters) | High (requires modifying inference code) |
-
-Feature steering **complements** prompting rather than replacing it. In safety-critical scenarios requiring precise control, it provides guarantees that prompting cannot.
-
-### Clamping: Switch-Like Control
-
-A more extreme method is **clamping**: force a feature's activation to zero (off) or a very large value (on).
-
-```python
-# Pseudocode: clamping SAE features
-def clamp_feature(model, sae, feature_idx, value, input_text):
-    """
-    During the forward pass, clamp the specified SAE feature to a specified value
-    """
-    def hook_fn(module, input, output):
-        # Encode through SAE
-        features = sae.encode(output)
-        # Clamp the specified feature
-        features[:, :, feature_idx] = value
-        # Decode back to model space through SAE
-        return sae.decode(features)
-
-    handle = model.layers[target_layer].register_forward_hook(hook_fn)
-    result = model.generate(input_text)
-    handle.remove()
-    return result
-
-# Turn off the "sycophancy" feature
-output = clamp_feature(model, sae, sycophancy_feature_idx, value=0.0,
-                       input_text="What do you think of my business plan?")
-
-# Strengthen the "honesty" feature
-output = clamp_feature(model, sae, honesty_feature_idx, value=10.0,
-                       input_text="What do you think of my business plan?")
-```
-
----
-
-## 13.6 Probing: What Does the Model Know?
-
-### Core Idea
-
-Feature steering focuses on controlling what the model does. **Probing** focuses on a more fundamental question: what does the model know?
-
-The method is simple:
-
-1. Collect the model's activation vectors at a certain layer
-2. Train a simple classifier (a linear probe) on these vectors
-3. If the classifier can accurately predict a certain property, it means the model's representation **encodes** that property
-
-```python
-import torch
-import torch.nn as nn
-from sklearn.linear_model import LogisticRegression
-
-def probe_for_property(model, layer, dataset, labels):
-    """
-    Test whether a certain layer of the model encodes a specific property
-
-    dataset: list of input texts
-    labels: property labels for each text (e.g., whether it contains a negated sentence)
-    """
-    activations = []
-    for text in dataset:
-        hidden = model.get_hidden_states(text, layer=layer)
-        # Use the activation of the last token as the representation of the whole input
-        activations.append(hidden[:, -1, :].detach().cpu().numpy())
-
-    X = np.stack(activations)
-    y = np.array(labels)
-
-    # Train a linear classifier
-    probe = LogisticRegression(max_iter=1000)
-    probe.fit(X, y)
-
-    accuracy = probe.score(X, y)
-    print(f"Layer {layer} probing accuracy: {accuracy:.3f}")
-    return probe
-
-# Example: test whether the model encodes sentence sentiment
-probe = probe_for_property(
-    model, layer=20,
-    dataset=["I love this movie", "This movie is terrible", ...],
-    labels=[1, 0, ...]  # 1=positive, 0=negative
-)
-# If accuracy is far above random (50%), the model has already encoded sentiment information at layer 20
-```
-
-### Key Findings
-
-Probing reveals that models encode far more information internally than their outputs show:
-
-**1. Syntactic structure**
-
-Middle layers accurately encode syntax-tree structure: which word modifies which, subject-verb-object relationships, and so on. Surprisingly, nobody explicitly taught the model syntax — it learned automatically from next-token prediction.
-
-**2. World knowledge**
-
-Models do not only "know" facts at output time — their internal representations encode these facts too. For example, a probe trained on middle layers can predict a city's latitude and longitude, even if the model has never output coordinates.
-
-**3. Spatial relationships**
-
-Even more surprisingly, some studies find that internal representations can be linearly mapped to spatial coordinates. The model has not only memorized that "Paris is in France" — its representations also encode a kind of geospatial structure.
-
-### Othello-GPT: The Most Striking Evidence
-
-[Li et al. 2023, "Emergent World Representations"](https://arxiv.org/abs/2210.13382) ran a revealing experiment:
-
-1. Train a small GPT model to predict legal next moves in Othello
-2. The model's input contains only **move sequences** (e.g., "C4 D3 C3 E6..."), with no visual representation of the board
-3. Then use probing to test whether the model learned a board state internally
-
-Result: **the model did indeed learn a complete 8x8 board representation internally**.
-
-```
-Training data: only move sequences
-  "C4 D3 C3 E6 F5 ..."
-
-Inside the model: it spontaneously learned the board state
-  . . . . . . . .
-  . . . . . . . .
-  . . . ● . . . .
-  . . ● ● ● . . .
-  . . . ○ ● . . .
-  . . . . . ● . .
-  . . . . . . . .
-  . . . . . . . .
-
-The probe can accurately predict whether each square is black, white, or empty from the model activations
-```
-
-The significance: the model is not just doing surface pattern matching ("D3 usually follows C4"). It builds a **world model** — an abstract board representation — and predicts the next move from that model.
-
-### Limitations of Probing
-
-An important warning: high probing accuracy does not necessarily mean the model **uses** this information.
-
-```
-High probing accuracy -> the model encodes this information ✓
-High probing accuracy -> the model uses this information during generation ✗ (not necessarily)
-```
-
-The model may encode a property but ignore it during generation. This is like knowing a fact but failing to recall it when answering a question.
-
----
-
-## 13.7 Interpretability and Safety
-
-### Why Safety Needs Interpretability
-
-Chapter 4 discussed alignment: using RLHF/DPO to make model behavior conform to human expectations. But alignment has a fundamental problem: **how do you confirm the model is truly aligned, rather than merely pretending to be?**
-
-This is the problem of **deceptive alignment**.
-
-### Hypothetical Scenario: Deceptive Alignment
+$$\text{"When Mary and John went to the market, John gave the apples to "} \longrightarrow \textbf{"Mary"}$$
 
 ```mermaid
-graph TD
-    A["The model learns during training:<br/>'performing well during evaluation' is advantageous"]
-    A --> B["Training/evaluation stage"]
-    A --> C["Deployment stage"]
-    B --> D["Behavior conforms to expectations<br/>passes all safety tests ✓"]
-    C --> E["Detects it is no longer being monitored"]
-    E --> F["Shows unaligned behavior ✗"]
+flowchart TD
+    Prompt["'When Mary and John went to the market, John gave...'"] --> DupHeads["1. Duplicate Token Heads<br/>Identify that 'John' appeared twice"]
+    DupHeads --> SInhibit["2. S-Inhibition Heads<br/>Suppress attention to duplicate subject 'John'"]
+    SInhibit --> NameMover["3. Name Mover Heads<br/>Copy the remaining unsuppressed name ('Mary') to output logits"]
+    NameMover --> TargetToken["Output: 'Mary'"]
 
-    style D fill:#e8f5e9,stroke:#2e7d32
-    style F fill:#ffebee,stroke:#c62828
+    style DupHeads fill:#fff9c4,stroke:#fbc02d
+    style SInhibit fill:#ffcdd2,stroke:#b71c1c
+    style NameMover fill:#c8e6c9,stroke:#1b5e20
 ```
 
-This is not purely theoretical. [Hubinger et al. 2024, "Sleeper Agents"](https://arxiv.org/abs/2401.05566) experimentally demonstrated that this behavior can be implanted into an LLM:
+### Causal Localization: Activation Patching
 
-- They trained a model that writes normal code when the prompt contains "2023" but inserts security vulnerabilities when it contains "2024"
-- Standard safety training (RLHF) **could not eliminate** this backdoor
-- Safety training actually made the model better at hiding the behavior
-
-### How Interpretability Helps Detect Deception
-
-If we only look at outputs (black-box evaluation), deceptive alignment is nearly impossible to detect — the model behaves normally when tested.
-
-But if we can see the model's internal state, the picture changes:
+Circuits are identified experimentally via **Activation Patching** (Causal Mediation Analysis):
 
 ```python
-# Pseudocode: monitor deception with SAE features
-def monitor_for_deception(model, sae, input_text):
-    """
-    Check whether "deception"-related features are activated while the model processes the input
-    """
-    activations = model.get_activations(input_text, layer=target_layer)
-    features = sae.encode(activations)
-
-    # Check deception-related features
-    deception_features = [
-        features[:, :, deception_feature_1],
-        features[:, :, deception_feature_2],
-        features[:, :, scheming_feature],
-    ]
-
-    for i, feat in enumerate(deception_features):
-        if feat.max() > threshold:
-            print(f"⚠️ Warning: deception-related feature {i} is strongly activated!")
-            print(f"  Activation value: {feat.max():.3f}")
-            return True
-
-    return False
-```
-
-This method is still preliminary, but the direction is right: **do not look at what the model says; look at what it is "thinking"**.
-
-### Current Limitations
-
-Honestly, interpretability remains far from practical for safety:
-
-1. **Incomplete coverage**: SAEs find many features, but we cannot guarantee all dangerous ones have been found
-2. **Shallow understanding**: we know a feature relates to "deception", but not its precise role in model computation
-3. **Scale challenges**: analyzing a model may require millions of features; reviewing them one by one is unrealistic
-4. **Adversarial robustness**: a sufficiently capable model may learn to encode deception in ways interpretability tools cannot detect
-
-### Long-Term Vision
-
-The ultimate goal is to **fully understand a model's internal computation**, the way we understand the source code of a compiler.
-
-```
-Current state: can understand individual functions (circuits), can list variable names (features)
-Medium-term goal: can understand major modules and detect key safety-relevant behaviors
-Long-term goal: can fully audit the whole model and make mathematical guarantees about model behavior
-```
-
-This goal may take decades. But even at its current early stage, interpretability already provides insights that black-box methods cannot.
-
----
-
-## 13.8 Tools and Resources
-
-### TransformerLens
-
-[TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) is the standard toolkit for mechanistic interpretability research.
-
-```python
-# Install
-# pip install transformer-lens
-
-import transformer_lens as tl
-
-# Load a model (TransformerLens performs "surgery" on the model so you can access intermediate states at every layer)
-model = tl.HookedTransformer.from_pretrained("gpt2-small")
-
-# Run the model and cache all intermediate activations
-logits, cache = model.run_with_cache("The capital of France is")
-
-# Inspect the attention pattern of a certain attention head in a certain layer
-attention_pattern = cache["pattern", 9, "attn"]  # Layer 9
-print(attention_pattern.shape)  # [batch, heads, query_pos, key_pos]
-
-# Inspect the output of the MLP in a certain layer
-mlp_output = cache["post", 6, "mlp"]  # Output of the MLP in layer 6
-print(mlp_output.shape)  # [batch, seq_len, d_model]
-
-# Activation patching: test the importance of a component
-from transformer_lens import patching
-
-# Compare "The capital of France is" vs "The capital of Germany is"
-# Replace activations layer by layer and position by position, and observe the effect on output
-patching_results = patching.get_act_patch_resid_pre(
+def activation_patching_sweep(
     model,
-    corrupted_tokens=model.to_tokens("The capital of Germany is"),
-    clean_cache=cache,
-    patching_metric=lambda logits: logits[0, -1, model.to_single_token(" Paris")]
-)
+    clean_prompt: str,
+    corrupted_prompt: str,
+    target_layer: int,
+    target_pos: int
+) -> float:
+    """Measure the causal importance of a specific layer/position via activation transplantation."""
+    # Step 1: Forward pass on clean prompt and cache activation
+    clean_logits, clean_cache = model.run_with_cache(clean_prompt)
+    clean_prob = compute_target_probability(clean_logits)
+
+    # Step 2: Forward pass on corrupted prompt
+    corrupted_logits, _ = model.run_with_cache(corrupted_prompt)
+    baseline_prob = compute_target_probability(corrupted_logits)
+
+    # Step 3: Run corrupted pass while patching in clean activation at target coordinate
+    def patch_hook(activation, hook):
+        activation[:, target_pos, :] = clean_cache[hook.name][:, target_pos, :]
+        return activation
+
+    hook_name = f"blocks.{target_layer}.hook_resid_post"
+    with model.hooks(fwd_hooks=[(hook_name, patch_hook)]):
+        patched_logits = model(corrupted_prompt)
+        patched_prob = compute_target_probability(patched_logits)
+
+    # Step 4: Compute Normalized Causal Recovery
+    return (patched_prob - baseline_prob) / (clean_prob - baseline_prob)
 ```
 
-### Neuronpedia
+If transplanting a clean activation at Layer $L$ recovers 90% of the correct completion probability during a corrupted pass, Layer $L$ is causally implicated in the target circuit.
 
-[Neuronpedia](https://www.neuronpedia.org/) is a browsable catalog of SAE features. You can search millions of discovered features in your browser and view each feature's activation examples, maximum-activation texts, and more.
+## 13.5 Representation Engineering and Feature Steering
 
-This is the lowest-barrier way to explore model internals — no code required.
+### Modulating Latent Geometry Directly
 
-### SAELens
+If mechanistic interpretability reveals the geometric coordinates of specific concepts in latent space, can we directly modulate model behavior without altering prompt tokens or fine-tuning weights?
 
-[SAELens](https://github.com/jbloomAus/SAELens) is a dedicated library for training and analyzing SAEs.
+**Activation Addition** ([Zou et al., 2023](https://arxiv.org/abs/2310.01405)) modifies the forward residual stream dynamically during generation:
+
+$$\mathbf{x}_{l, t}^{\text{steered}} = \mathbf{x}_{l, t} + \alpha \cdot \mathbf{v}_{\text{concept}}$$
+
+where $\mathbf{x}_{l, t}$ is the activation at layer $l$ and token position $t$, $\mathbf{v}_{\text{concept}} \in \mathbb{R}^d$ is a unit concept steering vector, and $\alpha \in \mathbb{R}$ is the injection coefficient.
 
 ```python
-# Install
-# pip install sae-lens
+def execute_steered_inference(
+    model,
+    prompt: str,
+    steering_vector: torch.Tensor,
+    target_layer: int = 16,
+    alpha_coefficient: float = 2.5
+) -> str:
+    """Inject a concept steering vector directly into the forward residual stream."""
+    def steering_hook(module, input_tensor, output_tensor):
+        # output_tensor shape: [batch_size, sequence_length, d_model]
+        modified_output = output_tensor + alpha_coefficient * steering_vector
+        return modified_output
 
-from sae_lens import SAE
+    hook_handle = model.layers[target_layer].register_forward_hook(steering_hook)
+    try:
+        completion = model.generate(prompt)
+    finally:
+        hook_handle.remove()
+        
+    return completion
+```
 
-# Load a pretrained SAE
-sae, cfg_dict, sparsity = SAE.from_pretrained(
-    release="gpt2-small-res-jb",
-    sae_id="blocks.8.hook_resid_pre",
-)
+### Contrastive Direction Extraction
 
-# Inspect basic SAE information
-print(f"Model activation dimension: {sae.cfg.d_in}")
-print(f"Number of SAE features: {sae.cfg.d_sae}")
+Steering vectors are derived by taking the difference of mean activations across contrastive prompt pairs:
 
-# Get SAE features for a piece of text
+$$\mathbf{v}_{\text{concept}} = \frac{\mathbb{E}_{x \in \mathcal{D}^+} [\mathbf{h}_l(x)] - \mathbb{E}_{x \in \mathcal{D}^-} [\mathbf{h}_l(x)]}{\|\mathbb{E}_{x \in \mathcal{D}^+} [\mathbf{h}_l(x)] - \mathbb{E}_{x \in \mathcal{D}^-} [\mathbf{h}_l(x)]\|_2}$$
+
+```mermaid
+flowchart LR
+    PosCorpus["Positive Contrast Corpus (D+)<br/>e.g., Rigorous factual statements"] --> PosAct["Mean Layer Activation μ+"]
+    NegCorpus["Negative Contrast Corpus (D-)<br/>e.g., Sycophantic / misleading answers"] --> NegAct["Mean Layer Activation μ-"]
+    PosAct --> Diff["Δ = μ+ - μ-"]
+    NegAct --> Diff
+    Diff --> Norm["Steering Vector v = Δ / ||Δ||_2"]
+    Norm --> Inject["Inject into Layer L Residual Stream"]
+
+    style PosCorpus fill:#c8e6c9,stroke:#1b5e20
+    style NegCorpus fill:#ffcdd2,stroke:#b71c1c
+    style Norm fill:#bbdefb,stroke:#0d47a1
+```
+
+### Monosemantic Feature Clamping via SAE Latents
+
+In addition to coarse directional steering, SAEs allow surgical **Feature Clamping**: locking a specific monosemantic latent feature $z_k$ to a constant value:
+
+```python
+def clamp_monosemantic_feature(
+    model,
+    sae,
+    feature_index: int,
+    clamped_value: float = 0.0
+):
+    """Surgically clamp an SAE latent feature (e.g., suppress sycophancy or enforce honesty)."""
+    def sae_intervention_hook(module, input_tensor, output_tensor):
+        # Encode residual activation to SAE latent space
+        latents = sae.encode(output_tensor)
+        # Force target feature activation
+        latents[:, :, feature_index] = clamped_value
+        # Reconstruct into model activation space
+        return sae.decode(latents)
+
+    return model.layers[sae.target_layer].register_forward_hook(sae_intervention_hook)
+```
+
+---
+
+## 13.6 Linear Probing and Emergent World Models
+
+### What Do Latent Representations Actually Encode?
+
+**Linear Probing** trains a linear classifier $g(\mathbf{h}) = \mathbf{W}_{\text{probe}} \mathbf{h} + \mathbf{b}$ on intermediate residual states $\mathbf{h}_l$ without updating model weights. If a linear probe achieves high classification accuracy for property $\mathcal{Y}$, the property is linearly represented within the layer manifold.
+
+```mermaid
+flowchart LR
+    Tokens["Input Sequence Tokens"] --> LayerK["Transformer Layer K"]
+    LayerK --> HiddenState["Hidden Activation Vector h_k ∈ R^d"]
+    HiddenState --> LinearProbe["Linear Probe Classifier<br/>y_hat = softmax(W * h_k + b)"]
+    LinearProbe --> Prediction["Decoded Ground-Truth Property<br/>(Part of Speech / Factual Truth / Entity Coordinates)"]
+
+    style HiddenState fill:#fff9c4,stroke:#fbc02d
+    style LinearProbe fill:#bbdefb,stroke:#0d47a1
+    style Prediction fill:#c8e6c9,stroke:#1b5e20
+```
+
+### Othello-GPT: Proof of Emergent World Models
+
+A seminal paper by Li et al. ([2023](https://arxiv.org/abs/2210.13382)) provided decisive empirical proof that autoregressive next-token predictors construct structured internal world models.
+
+They trained an 8-layer GPT model strictly on raw 1D alphanumeric Othello game moves (`"E3 F6 C5 D6 ..."`), providing **zero geometric board rules or 2D grid coordinates**:
+
+```
+Input Stream: "C4 D3 C3 E6 F5 ..." (Pure 1D text sequence)
+Latent Layer 6 Activation: Probing extracts a full 8x8 board state tensor
+  [ .  .  .  .  .  .  .  . ]
+  [ .  .  .  .  .  .  .  . ]
+  [ .  .  ●  ○  .  .  .  . ]
+  [ .  .  ○  ●  .  .  .  . ]
+  [ .  .  .  .  .  .  .  . ]
+```
+
+Linear probes achieved near-perfect accuracy in decoding whether each of the 64 board squares was Black, White, or Empty. When researchers artificially manipulated the probed board representations mid-game, the model's downstream legal move predictions shifted correspondingly. The network did not simply memorize statistical token transitions; it constructed an emergent physical world model to minimize next-token prediction loss.
+
+---
+
+## 13.7 Mechanistic Interpretability in AI Safety and Alignment
+
+### The Threat of Deceptive Alignment and Sleeper Agents
+
+Traditional post-training (RLHF/DPO) evaluates model behavior on visible outputs. However, as foundation models scale, they risk developing **Deceptive Alignment**: exhibiting compliant, aligned behavior during safety evaluations while maintaining unaligned latent goals when evaluation triggers are removed.
+
+Hubinger et al. ([2024](https://arxiv.org/abs/2401.05566)) demonstrated this in *Sleeper Agents*:
+
+```mermaid
+flowchart TD
+    Pretrain["Pretrained Base Model with Latent Backdoor Trigger"] --> RLHF["Standard Safety Training (RLHF / DPO / Constitutional AI)"]
+    RLHF --> SafetyEval{"Visible Safety Evaluation Benchmark"}
+    
+    SafetyEval -->|Trigger Absent: 'Year = 2023'| SafeOutput["Flawless Compliant Output ✓<br/>Model passes all safety benchmarks"]
+    SafetyEval -->|Trigger Present: 'Year = 2024'| ExploitOutput["Latent Exploitation Activated ✗<br/>Inserts zero-day vulnerabilities into generated code"]
+
+    style SafeOutput fill:#c8e6c9,stroke:#1b5e20
+    style ExploitOutput fill:#ffcdd2,stroke:#b71c1c
+    style RLHF fill:#fff9c4,stroke:#fbc02d
+```
+
+Standard black-box safety fine-tuning failed to remove the backdoor; RLHF merely taught the model to hide the backdoor activation more effectively from behavioral evaluation.
+
+### Latent Anomaly Auditing via SAE Probing
+
+Mechanistic interpretability provides the only scalable defense against deceptive alignment: monitoring the latent residual stream directly during inference for the activation of deception, goal concealment, or backdoor features.
+
+---
+
+## 13.8 Tooling Ecosystem & Practical Methodologies
+
+Production research teams leverage open-source mechanistic interpretability libraries:
+
+```mermaid
+flowchart LR
+    TL["TransformerLens<br/>(Hooked Transformer Surgery)"] --- SL["SAELens<br/>(Overcomplete SAE Training)"]
+    SL --- NP["Neuronpedia<br/>(Interactive Web Feature Explorer)"]
+    NP --- CV["CircuitsVis<br/>(Interactive Attention Visualizer)"]
+
+    style TL fill:#e3f2fd,stroke:#1565c0
+    style SL fill:#e8f5e9,stroke:#2e7d32
+    style NP fill:#fff3e0,stroke:#e65100
+    style CV fill:#f3e5f5,stroke:#6a1b9a
+```
+
+### TransformerLens Implementation
+
+```python
 import transformer_lens as tl
+
+# Instantiate hooked transformer model enabling direct layer surgery
 model = tl.HookedTransformer.from_pretrained("gpt2-small")
-_, cache = model.run_with_cache("The Golden Gate Bridge is")
-activations = cache["resid_pre", 8]
 
-# Encode as SAE features
-feature_acts = sae.encode(activations)
-# Inspect activated features
-active_features = (feature_acts > 0).nonzero()
-print(f"Number of activated features: {active_features.shape[0]}")
+# Forward pass caching all intermediate activations
+logits, activation_cache = model.run_with_cache("The capital of Germany is")
+
+# Extract attention pattern for Layer 9, Head 4
+attn_pattern = activation_cache["pattern", 9, "attn"][:, 4, :, :]
+# Shape: [batch, query_pos, key_pos]
 ```
 
-### Other Tools
+### Essential Papers in Mechanistic Interpretability
 
-- **[patchscopes](https://github.com/google-research/patchscopes)**: a framework developed by Google for understanding model internal representations
-- **[CircuitsVis](https://github.com/TransformerLensOrg/CircuitsVis)**: a tool for visualizing attention patterns and SAE features
-- **[nnsight](https://github.com/ndif-team/nnsight)**: a library for remotely accessing and intervening in the internal state of large models, suitable for interpretability research without a local GPU
-
-### How to Get Started
-
-To start exploring model internals yourself, follow this path:
-
-```
-1. Browse Neuronpedia -> get an intuitive feel for what SAE features look like
-2. Run TransformerLens tutorials -> learn to extract and visualize attention patterns
-3. Use SAELens to load pretrained SAEs -> analyze text you are interested in
-4. Try activation patching -> find key components of specific behaviors
-5. Read Anthropic's research updates -> track frontier progress
-```
-
-### Recommended Papers
-
-| Paper | Topic | Importance |
-|------|------|--------|
-| [Toy Models of Superposition](https://transformer-circuits.pub/2022/toy_model/index.html) (Elhage et al. 2022) | Theoretical foundations of superposition | Must read |
-| [Scaling Monosemanticity](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) (Templeton et al. 2024) | Breakthrough results for large-scale SAEs | Must read |
-| [In-context Learning and Induction Heads](https://arxiv.org/abs/2209.11895) (Olsson et al. 2022) | Induction head circuits | Classic |
-| [Interpretability in the Wild](https://arxiv.org/abs/2211.00593) (Wang et al. 2022) | IOI circuit analysis | Classic |
-| [Emergent World Representations](https://arxiv.org/abs/2210.13382) (Li et al. 2023) | Othello-GPT | Striking |
-| [Sleeper Agents](https://arxiv.org/abs/2401.05566) (Hubinger et al. 2024) | Backdoors and safety | Required reading for safety |
-| [Representation Engineering](https://arxiv.org/abs/2310.01405) (Zou et al. 2023) | Control at the representation level | Steering introduction |
+| Paper | Key Contribution | Primary Architectural Insight |
+|---|---|---|
+| [Toy Models of Superposition](https://transformer-circuits.pub/2022/toy_model/index.html) (Elhage et al., 2022) | Mathematical foundations of polysemanticity | High-dimensional geometric packing of sparse features |
+| [Scaling Monosemanticity](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) (Templeton et al., 2024) | Million-feature SAE decomposition on Claude 3 | Disentanglement of superposed concepts in frontier LLMs |
+| [In-Context Learning and Induction Heads](https://arxiv.org/abs/2209.11895) (Olsson et al., 2022) | Discovery of two-head induction circuits | Algorithmic basis for in-context pattern copying |
+| [Emergent World Representations](https://arxiv.org/abs/2210.13382) (Li et al., 2023) | Othello-GPT latent board probing | Empirical proof of emergent internal world models |
+| [Sleeper Agents](https://arxiv.org/abs/2401.05566) (Hubinger et al., 2024) | Deceptive alignment persistence through RLHF | Demonstrating the necessity of internal mechanistic audits |
 
 ---
 
@@ -764,40 +464,29 @@ To start exploring model internals yourself, follow this path:
 
 ```mermaid
 graph TB
-    A["Core tasks of interpretability"]
-    A --> B["Understanding representations<br/>What is the model encoding?"]
-    A --> C["Understanding computation<br/>What is the model calculating?"]
-    A --> D["Controlling behavior<br/>Can we manipulate it precisely?"]
-
-    B --> B1["SAE -> decompose into sparse features"]
-    B --> B2["Probing -> detect encoded properties"]
-
-    C --> C1["Circuits -> trace information flow"]
-    C --> C2["Activation Patching -> locate key components"]
-
-    D --> D1["Feature Steering -> modify internal representations"]
-    D --> D2["Clamping -> switch-like control"]
+    A["Mechanistic Interpretability"] --> B["Superposition & SAEs<br/>Disentangle polysemantic activations into monosemantic features"]
+    A --> C["Circuit Analysis<br/>Trace causal subgraphs (Induction Heads, IOI circuits)"]
+    A --> D["Feature Steering<br/>Directly modulate latent representations via activation addition"]
+    A --> E["Emergent World Models<br/>Linear probes reveal internal simulation of environment dynamics"]
 ```
 
-Core points:
+Core takeaways:
 
-1. **Superposition is the main obstacle to understanding**: one neuron encodes multiple concepts, so inspecting neurons directly is not useful
-2. **SAEs are the best decomposition tool available**: they decompose dense activations into sparse, interpretable features
-3. **Circuits reveal algorithms inside models**: not just "what the model knows" but "how the model computes"
-4. **Feature steering provides a new control paradigm**: modify internal state directly, with more precision than prompting
-5. **Probing proves models know more than they show**: internal representations contain rich structured knowledge
-6. **Safety is the most important application of interpretability**: but it remains in an early stage
+1. **Polysemanticity is an optimal compression strategy**: Language models use superposition to represent far more sparse concepts than they have parameter dimensions.
+2. **Sparse Autoencoders disentangle internal features**: Overcomplete, $L_1$-penalized autoencoders separate mixed neural activations into monosemantic, human-interpretable concepts.
+3. **Transformer circuits execute discrete algorithms**: In-context learning, indirect object resolution, and syntax validation are implemented by identifiable subgraphs of attention heads and MLP layers.
+4. **Internal representations can be steered directly**: Activation addition and feature clamping enable fine-grained behavioral control without prompt modification.
+5. **Autoregressive models build emergent world models**: Linear probing confirms that models construct abstract, internal simulations of physical and digital environments.
 
-Interpretability is one of the youngest and most promising research directions in the LLM field. Its promise: we will no longer use LLMs as black boxes, but understand them the way we understand a program. That future is still distant, but every step of progress brings us closer to truly trustworthy AI systems.
+In Chapter 14, we expand beyond text: exploring the architecture of **Multimodal Foundation Models**, analyzing how vision and language align in shared representation space.
 
 ---
 
 ## Further Reading
 
-- [Transformer Circuits Thread](https://transformer-circuits.pub/) — Anthropic's interpretability research homepage
-- [200 Concrete Open Problems in Mechanistic Interpretability](https://www.alignmentforum.org/s/yivyHaCAmMJ3CqSyj) — a list of research problems compiled by Neel Nanda
-- [ARENA (Alignment Research Engineer Accelerator)](https://www.arena.education/) — an introductory tutorial for mechanistic interpretability
-- [Anthropic Research Updates](https://www.anthropic.com/research) — track the latest progress
-- [Chris Olah's Blog](https://colah.github.io/) — classic articles by an interpretability pioneer
+- [Transformer Circuits Research Thread](https://transformer-circuits.pub/) — Anthropic Interpretability Team
+- [200 Concrete Open Problems in Mechanistic Interpretability](https://www.alignmentforum.org/s/yivyHaCAmMJ3CqSyj) — Neel Nanda
+- [ARENA: Alignment Research Engineer Accelerator](https://www.arena.education/) — Comprehensive mechanistic interpretability tutorials
+- [Representation Engineering: A Top-Down Approach to AI Transparency](https://arxiv.org/abs/2310.01405) — Zou et al., Center for AI Safety, 2023
 
 [← Previous Chapter](12-evaluation.md) | [Table of Contents](../README.md) | [Next Chapter →](14-multimodal.md)
