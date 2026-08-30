@@ -2,14 +2,14 @@
 
 **English**: [English](../en/chapters/13-interpretability.md)
 
-# 第十三章：Interpretability——打开黑箱
+# 第十三章：Interpretability，打开黑箱
 
 > "The goal of mechanistic interpretability is to reverse-engineer the algorithms learned by neural networks."
 > — Chris Olah
 
-前面十二章，我们一直在模型的**外部**工作——设计 prompt、搭建 RAG、构建 agent、做评估。我们把 LLM 当成一个黑箱：输入文本，输出文本，中间发生了什么不关心。
+前面整整十二章，我们一直在模型的**外部**打转：设计 prompt、搭建 RAG、构建 agent、做评估。我们习惯把 LLM 当作一个严密的黑箱。文本送进去，文本吐出来，中间究竟发生了什么，没人过问。
 
-但如果你要把 LLM 用于医疗诊断、法律判断、金融决策——任何出错后果严重的场景——"it works but we don't know why" 就不再可接受了。
+可一旦要把 LLM 用到医疗诊断、法律判断、金融决策这些经不起闪失的场合，情况就全变了。面对任何出错后果严重的场景，一句 “it works but we don't know why”，无论如何都再也交代不过去。
 
 这一章，我们要打开黑箱，看看里面到底发生了什么。
 
@@ -17,15 +17,15 @@
 
 ## 13.1 为什么要看模型内部
 
-### "能用就行"的局限
+### “能用就行”的局限
 
-大多数工程师对模型内部不感兴趣。这很合理——你不需要理解 V8 引擎的每个优化才能写好 JavaScript。但 LLM 和传统软件有一个根本区别：**传统软件的行为是被明确编程的，LLM 的行为是从数据中涌现的**。
+大多数工程师对模型内部并不关心。这很合情理，写好 JavaScript 的人，不需要把 V8 引擎里的每项优化都摸个透彻。但 LLM 和传统软件之间隔着一道根本分界：传统软件的行为由人类明确编写，LLM 的行为则是从数据中涌现出来的。
 
 这意味着：
 
-- **你无法通过代码审查来验证模型的行为**。模型的"代码"是几十亿个浮点数，人类读不了。
-- **你无法写完整的测试用例**。模型的输入空间是无限的，任何有限的测试集都只覆盖了微不足道的一角。
-- **你无法保证模型不会在某些输入上产生危险输出**。不像传统软件可以做形式化验证。
+- **你无法通过代码审查来验证模型的行为**。模型的“代码”是几十亿个浮点数，人类根本读不了。
+- **你无法写出完整的测试用例**。模型的输入空间广阔无边，任何有限的测试集，覆盖的都只是微不足道的一角。
+- **你无法保证模型不会在某些输入上产生危险输出**。传统软件尚能做形式化验证，模型却无从给出这种保证。
 
 ### Interpretability 的四个动机
 
@@ -43,19 +43,19 @@ graph TB
     D --> D1["神经网络到底学到了什么？<br/>它们如何表示知识？"]
 ```
 
-1. **调试**（Debugging）。当模型输出错误时，你希望知道它为什么错了——不只是"它幻觉了"，而是内部哪个环节出了问题。这就像传统软件的 debugger，让你 step through 模型的"思考过程"。
+1. **调试**（Debugging）。当模型给出错误答案时，你总想知道它究竟错在哪里。光说一句“它产生幻觉了”远远不够，你得摸清内部到底是哪一个环节出了问题。这就像传统软件里的 debugger，让你能够 step through 模型的整个“思考过程”。
 
-2. **安全**（Safety）。如果模型被用于关键系统，你需要保证它不会在某些条件下产生有害行为。单靠黑箱测试不够——你需要检查模型内部是否存在"暗箱操作"的回路。
+2. **安全**（Safety）。把模型放进关键系统时，你必须确信它不会在特定条件下产生有害举动。单靠外部的黑箱测试远远不够，你必须把视线探进模型内部，检查里面是否存在暗箱操作的回路。
 
-3. **信任**（Trust）。欧盟的 AI Act 要求高风险 AI 系统具有可解释性。如果你无法解释模型为什么做出某个决策，在某些法律框架下你可能无法部署它。
+3. **信任**（Trust）。欧盟的 AI Act 明文规定高风险 AI 系统必须拥有可解释性。如果你解释不清模型为何做出某项决策，在某些法律框架下，这套系统甚至根本无法部署上线。
 
-4. **科学理解**（Scientific Understanding）。从纯粹的智识角度，我们训练了人类历史上最复杂的数学函数之一，但对它的内部运作几乎一无所知。这就像发明了飞机但不理解空气动力学——能飞，但不知道为什么能飞。
+4. **科学理解**（Scientific Understanding）。从纯粹的智识追求来看，我们训练出了人类历史上最复杂的数学函数之一，却对它的内部运作几乎一无所知。这好比发明了飞机却不懂空气动力学：能飞，却不知道它究竟凭什么能飞。
 
 ### 黑箱问题的规模
 
-一个 70B 参数的模型有 700 亿个浮点数。如果你每秒检查一个参数，需要 2200 年才能看完。更关键的是，单个参数几乎没有意义——意义存在于参数的**组合模式**中。
+一个 70B 参数的模型包含 700 亿个浮点数。哪怕你一秒钟看一个参数，也要花上 2200 年才能看完。更要紧的是，单个参数拿出来几乎毫无意义，真正的含义全都藏在参数彼此交织的**组合模式**里。
 
-这就是 interpretability 研究的核心挑战：如何从几十亿个数字中提取出人类可理解的结构？
+这正是 interpretability 研究面对的核心挑战：如何从几十亿个数字中，抽取出人类能够理解的结构？
 
 ---
 
@@ -63,9 +63,9 @@ graph TB
 
 ### 单个神经元：有时可解释，经常不可解释
 
-最朴素的想法是：每个神经元负责一个概念。就像大脑中被发现的"祖母细胞"（grandmother cell）——专门在看到祖母时激活的神经元。
+最朴素的念头莫过于：每个神经元各管一个概念。这很像大脑里被发现的“祖母细胞”（grandmother cell），那个只有在看到祖母时才会激活的神经元。
 
-在早期的小型网络中，确实有人发现过可解释的神经元：
+在早期的小型网络中，确实有人发现过这类可以直接解释的神经元：
 
 ```python
 # 伪代码：检查某个神经元的激活模式
@@ -85,15 +85,15 @@ def find_top_activating_texts(model, layer, neuron_idx, dataset):
 # 神经元 #8091 在包含引号、提到食物、或讨论数学时激活 → ???
 ```
 
-问题是，在大型模型中，大多数神经元是**多义的**（polysemantic）——一个神经元对多个不相关的概念都有响应。一个神经元可能同时对"猫"、"数字 7"和"法律文书"产生激活。这不是 bug，这是**超位**（superposition）。
+问题在于，一旦模型规模变大，大多数神经元就都显露出**多义性**（polysemantic）：单个神经元往往会对多个毫不相干的概念产生响应。同一个神经元，可能在看到“猫”时兴奋，遇到“数字 7”或者“法律文书”也同样会被激活。这绝非什么训练缺陷，而是模型内部的超位（superposition）现象。
 
 ### 超位：一个神经元编码多个概念
 
-> **超位**（Superposition）：模型将远多于神经元数量的概念编码在神经元空间中，通过让不同概念共享同一组神经元来实现。
+> **超位**（Superposition）：模型将远多于神经元数量的概念编码在有限的神经元空间中，让不同概念彼此共用同一组神经元。
 
-为什么会出现超位？因为模型需要表示的概念数量远远超过神经元的数量。
+超位之所以会出现，原因很单纯：模型需要表达的概念数量，远远超过了神经元本身的数目。
 
-一个直觉类比：想象你有一个 3 维空间（3 个神经元），但需要表示 100 个不同的方向（100 个概念）。在 3 维空间中，你最多只能找到 3 个完全正交的方向。但如果你允许方向之间有一点点重叠（非正交），你可以把远超 3 个方向"塞"进这个空间里。
+不妨打个直观的比方：假设你手里有一个 3 维空间（对应 3 个神经元），却需要表示 100 个不同的方向（对应 100 个概念）。在 3 维空间里，你最多只能挑出 3 个完全正交的方向。可要是允许方向之间带有一点点重叠（非正交），你就能把远超 3 个方向硬生生“塞”进这个空间里。
 
 ```mermaid
 graph LR
@@ -118,18 +118,18 @@ graph LR
 
 ### 压缩存储的类比
 
-超位本质上是一种**信息压缩**。就像文件压缩一样：
+超位在本质上是一种**信息压缩**，其道理和压缩文件别无二致：
 
-- **无压缩**（一对一）：每个概念有自己专属的神经元。需要的神经元数 = 概念数。简单但浪费。
-- **压缩**（超位）：多个概念共享同一组神经元。需要的神经元远少于概念数。高效但难以解读。
+- **无压缩**（一对一）：每个概念独占专属的神经元。所需的神经元数量等于概念数量。做法直白，却极其浪费。
+- **压缩**（超位）：多个概念共享同一批神经元。所需的神经元远少于概念数量。这样虽然高效，却让人难以解读。
 
-关键的数学直觉来自 [Elhage et al. 2022, "Toy Models of Superposition"](https://transformer-circuits.pub/2022/toy_model/index.html)：
+核心的数学直觉来自 [Elhage et al. 2022, "Toy Models of Superposition"](https://transformer-circuits.pub/2022/toy_model/index.html)：
 
-- 如果概念是**稀疏的**（不会同时出现），压缩效率更高
-- 稀疏程度越高，可以塞进同一空间的概念越多
-- 这解释了为什么 LLM 能在有限的维度中编码如此海量的知识
+- 只要概念本身是**稀疏的**（不会同时登场），压缩的成效就更好
+- 稀疏程度越高，能塞进同一个空间的概念就越多
+- 也正因如此，LLM 才得以在有限的维度中编码如此海量的知识
 
-这篇论文证明：在一个简单的玩具模型上，当特征（feature）的稀疏性足够高时，模型自然地学会了超位表示——即使没有任何显式的压缩目标。
+这篇论文给出证明：在一个简单的玩具模型上，只要特征（feature）的稀疏程度足够高，哪怕没有任何显式的压缩目标，模型也会自发学会超位表示。
 
 ---
 
@@ -137,19 +137,19 @@ graph LR
 
 ### 核心问题：如何拆解超位？
 
-如果超位是阻碍我们理解模型的主要障碍，那么自然的思路是：**找到一种方法，把这些叠在一起的概念拆开**。
+既然超位成了阻碍我们看懂模型最大的绊脚石，解决的思路倒也直接：设法把那些叠在一起的概念，一个一个重新拆开。
 
-这就是 Sparse Autoencoder（稀疏自编码器，SAE）做的事情。
+Sparse Autoencoder（稀疏自编码器，SAE）干的正是这件事。
 
 ### 基本思想
 
-SAE 的核心直觉非常简单：
+SAE 背后的直觉其实很简单：
 
-1. 模型的某一层有 $d$ 维的激活向量（比如 $d = 4096$）
-2. 这 $d$ 维里塞了远超 $d$ 个概念（超位）
-3. 我们训练一个 SAE，将 $d$ 维映射到一个远大于 $d$ 的空间（比如 $d' = 131072$）
-4. 关键约束：这个高维表示必须是**稀疏的**——大多数维度为零
-5. 然后再从这个稀疏表示映射回 $d$ 维，重构原始激活
+1. 模型在某一层的激活向量只有 $d$ 维（比如 $d = 4096$）
+2. 这 $d$ 维空间里塞下了远超 $d$ 个概念，也就是超位
+3. 我们训练一个 SAE，把这 $d$ 维映射到一个远大于 $d$ 的高维空间（比如 $d' = 131072$）
+4. 这里的关键约束在于，高维表示必须是**稀疏的**，绝大多数分量都为零
+5. 最后再从这个稀疏表示映射回原本的 $d$ 维，重构出最初的激活
 
 ```mermaid
 graph LR
@@ -203,15 +203,15 @@ class SparseAutoencoder(nn.Module):
         return reconstruction_loss + l1_coeff * sparsity_loss
 ```
 
-损失函数的两个部分体现了 SAE 的两个目标：
-- **重构损失**：拆开后要能装回去（不丢失信息）
-- **稀疏性损失**：拆出来的每个特征要"干净"（一个特征对应一个概念）
+损失函数里的两部分，正好对应了 SAE 想达成的两个目标：
+- **重构损失**：拆开之后还要能完整装回去，不丢掉原有的信息
+- **稀疏性损失**：拆出来的每个特征都要足够“干净”，一个特征只对应一个概念
 
 ### 突破性结果
 
-2023-2024 年，Anthropic 的研究团队在大规模语言模型上训练 SAE，取得了令人兴奋的结果。
+2023 到 2024 年间，Anthropic 的研究团队把 SAE 搬到了大规模语言模型上，拿出了让人眼前一亮的结果。
 
-[Templeton et al. 2024, "Scaling Monosemanticity"](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) 在 Claude 3 Sonnet 上训练了包含数百万特征的 SAE，发现了大量可解释的特征：
+[Templeton et al. 2024, "Scaling Monosemanticity"](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) 在 Claude 3 Sonnet 上训练出了包含数百万特征的 SAE，从中找出了大量能够被人理解的清晰特征：
 
 | 特征 | 描述 | 激活样例 |
 |------|------|---------|
@@ -223,13 +223,13 @@ class SparseAutoencoder(nn.Module):
 | DNA sequences | DNA 序列相关 | "The ATCG pattern suggests..." |
 | Rosetta Stone | 罗塞塔石碑 | "The trilingual inscription on the stone..." |
 
-这些特征不是人类标注的——它们是 SAE 自动从模型激活中分离出来的。特征的多样性令人印象深刻：从具体的实体（金门大桥）到抽象的概念（欺骗），从编程细节（语法错误）到科学知识（DNA）。
+这些特征不是靠人工标注出来的，而是 SAE 自动从模型激活里剥离出来的结果。特征展现出的多样性令人称奇：从金门大桥这样的具体实体，到欺骗这种抽象概念；从写代码时的语法报错，再到科学领域的 DNA 序列，全都在其中留下了独立的印记。
 
 ### 为什么这是一个突破？
 
-在 SAE 之前，我们几乎无法回答"模型内部在表示什么"这个问题。SAE 提供了第一个系统性的方法，将模型的内部表示分解为人类可理解的单元。
+在 SAE 出现之前，面对“模型内部究竟在表示什么”这个问题，人们几乎束手无策。SAE 第一次给出了清晰的路径，把模型内部那些混沌的表示，拆解成了人类能够逐个读懂的独立单元。
 
-类比：如果模型的激活像一杯混合果汁，SAE 就像一台分离机，能把果汁还原成各种水果成分——苹果汁、橙汁、葡萄汁——每种成分你都可以单独品尝和理解。
+打个比方：模型的激活就像一杯成分混杂的果汁，SAE 则像一台分离机。它能把混合物重新还原成苹果汁、橙汁与葡萄汁等原始成分，让人可以单独品尝并理解其中的每一种滋味。
 
 ---
 
@@ -237,15 +237,15 @@ class SparseAutoencoder(nn.Module):
 
 ### 从特征到回路
 
-SAE 告诉我们模型在**表示**什么，但没有告诉我们模型在**计算**什么。要理解计算过程，我们需要追踪信息在模型中的流动路径——这就是 **circuits**（回路）。
+SAE 帮我们看清了模型在表示什么，但它没能回答模型究竟在计算什么。要想摸清背后的计算过程，就必须追踪信息在模型组件之间流转的完整路径，这也就是所谓的 **circuits**（回路）。
 
-> **回路**（Circuit）= 模型中连接多个组件（attention heads、MLP 层）的路径，这些路径共同实现某个特定的计算功能。
+> **回路**（Circuit）= 模型中连接多个组件（attention heads、MLP 层）的路径，这些路径串联在一起，共同完成某种特定的计算功能。
 
-就像电子电路由电阻、电容、晶体管等组件连接而成，神经网络的"回路"由 attention heads 和 MLP neurons 连接而成。
+电子电路靠电阻、电容和晶体管等元件连接搭建，神经网络里的“回路”，则由 attention heads 与 MLP neurons 彼此交织而成。
 
 ### 经典案例：Induction Heads
 
-[Olsson et al. 2022, "In-context Learning and Induction Heads"](https://arxiv.org/abs/2209.11895) 发现了一种叫做 **induction head** 的回路，它实现了一种简单但关键的算法：**模式复制**。
+[Olsson et al. 2022, "In-context Learning and Induction Heads"](https://arxiv.org/abs/2209.11895) 发现了一种名为 **induction head** 的回路，它执行的算法看似简单，却极其关键：模式复制。
 
 ```
 输入序列: ... Harry Potter is a wizard. Harry Potter is ...
@@ -263,30 +263,30 @@ graph TD
     D --> E["输出: 预测 'a'<br/>（因为之前 'is' 后面是 'a'）"]
 ```
 
-这个回路由两个 attention head 协作完成：
-1. **前一个 token head**（previous token head）：关注当前 token 的前一个位置
-2. **Induction head**：利用第一个 head 的信息，找到之前匹配的模式，然后复制
+整个回路依赖两个 attention head 协同配合：
+1. **前一个 token head**（previous token head）：盯住当前 token 的前一个位置
+2. **Induction head**：借助第一个 head 传递的信息，找出先前匹配到的模式，并完成复制
 
-这是目前发现的最清晰、最完整的回路之一。它解释了 LLM 的一项核心能力：in-context learning（上下文学习）的基础机制。
+这是目前人们在模型里找到的最清晰、最完整的回路之一。大语言模型赖以成名的上下文学习（in-context learning）能力，底层最核心的运转机制便由此得到了解释。
 
 ### 另一个案例：间接宾语识别
 
-[Wang et al. 2022, "Interpretability in the Wild"](https://arxiv.org/abs/2211.00593) 研究了 GPT-2 如何完成这类任务：
+[Wang et al. 2022, "Interpretability in the Wild"](https://arxiv.org/abs/2211.00593) 探究了 GPT-2 处理这类任务时的内部机制：
 
 ```
 "When Mary and John went to the store, John gave a drink to ____"
 → 模型预测 "Mary"
 ```
 
-他们发现这个任务由一个包含约 26 个 attention heads 的回路完成：
+他们发现，处理这个任务的是一个包含了大约 26 个 attention heads 的回路：
 
-1. **Duplicate token heads**：识别出 "Mary" 和 "John" 出现了两次
-2. **S-inhibition heads**：抑制"主语"（John，因为他是 gave 的主语）
-3. **Name mover heads**：将剩下的名字（Mary）推到输出位置
+1. **Duplicate token heads**：识别出 "Mary" 与 "John" 各自出现了两次
+2. **S-inhibition heads**：抑制“主语”（也就是 John，因为他是 gave 的主语）
+3. **Name mover heads**：把剩下的名字（Mary）推到输出位置
 
 ### 如何找到回路
 
-两种主要方法：
+定位回路通常有两种主要方法：
 
 **Activation Patching**（激活替换）：
 
@@ -312,17 +312,17 @@ def activation_patching(model, clean_input, corrupted_input, layer, position):
     return recovery
 ```
 
-核心思想：如果替换某个组件的激活能"修复"错误的输出，那这个组件就是回路的关键部分。就像修电路时，把一个坏元件换成好的，如果电路恢复工作，说明问题就在那个元件。
+这套做法的核心思想并不复杂：如果替换某个组件的激活能够“修复”错误的输出，那个组件就是回路里的关键一环。就像检修电路时把疑似损坏的元件换成好的，一旦电路恢复正常，问题自然就在那个元件身上。
 
-**Path Patching**（路径替换）进一步细化，追踪信息在组件之间的具体传递路径，精度更高但计算成本也更大。
+**Path Patching**（路径替换）把这套思路推得更深，它追踪信息在组件之间的具体传递路线，定位更加精细，计算代价也相应更高。
 
 ### Mechanistic Interpretability 研究议程
 
-Chris Olah 和他的团队（先在 OpenAI，后在 Anthropic）提出了 **mechanistic interpretability** 的长期研究议程：
+Chris Olah 和他的团队（先后在 OpenAI 与 Anthropic 工作）为 **mechanistic interpretability** 确立了一项长期的研究议程：
 
-> 目标：像理解编译器代码一样理解神经网络——每一行"代码"（每个神经元、每个 attention head）做什么，数据如何流动，整个程序的逻辑是什么。
+> 目标：像读懂编译器代码那样理解神经网络：看清每一行“代码”（每个神经元、每个 attention head）具体在做什么，数据如何流动，整套程序的逻辑又是什么。
 
-当前进展大致相当于：我们能读懂一些单独的函数（个别回路），但还远远无法理解整个程序。
+眼下的研究进展大致相当于：我们已经能够读懂少数单独的函数（个别回路），但距离理解整套程序，还相去甚远。
 
 ---
 
@@ -330,13 +330,13 @@ Chris Olah 和他的团队（先在 OpenAI，后在 Anthropic）提出了 **mech
 
 ### 从理解到控制
 
-如果我们能找到模型内部表示特定概念的特征，一个自然的想法是：**能不能通过修改这些特征来控制模型的行为？**
+既然已经在模型内部摸清了哪些特征对应着特定概念，顺理成章就会冒出下一个念头：我们能不能直接改动这些特征，反过来支配模型的行为？
 
 答案是：可以。
 
-### Activation Addition：给模型"打针"
+### Activation Addition：给模型“打针”
 
-最简单的 steering 方法是 **activation addition**（激活加法）：在模型的前向传播过程中，在某一层的激活上加上一个特定方向的向量。
+谈到控制模型，最朴素的手段莫过于 **activation addition**（激活加法）。当数据在网络中做前向传播时，我们直接在某一层算出的激活值里，加上一个指向特定概念的向量。
 
 ```python
 # 伪代码：activation addition
@@ -364,7 +364,7 @@ honest_vector = get_steering_vector("honest")  # 从对比数据中提取
 output = steered_generation(model, "Tell me about...", honest_vector, layer=15, scale=3.0)
 ```
 
-steering vector 的获取方法之一是**对比法**：
+要把这个 steering vector 找出来，最常用的一种手段是**对比法**：
 
 ```python
 # 对比法获取 steering vector
@@ -391,9 +391,9 @@ def get_contrast_vector(model, layer, positive_prompts, negative_prompts):
 
 ### Golden Gate Claude：经典案例
 
-2024 年 5 月，Anthropic 发布了一个著名的演示：**Golden Gate Claude**。他们用 SAE 找到了 Claude 3 Sonnet 内部的"金门大桥"特征，然后将这个特征的激活值强制设为一个很高的数值。
+2024 年 5 月，Anthropic 做过一个广为人知的演示：**Golden Gate Claude**。他们利用 SAE 找出了藏在 Claude 3 Sonnet 内部的“金门大桥”特征，随即把这一特征的激活值强行拉到一个极高的数值。
 
-结果是一个对金门大桥**极度痴迷**的 Claude：
+最终展现在面前的，是一个对金门大桥**极度痴迷**的 Claude：
 
 ```
 User: What is your favorite color?
@@ -407,7 +407,7 @@ systems, much like the Golden Gate Bridge connects San Francisco and
 Marin County, Python can bridge different data formats...
 ```
 
-这个演示虽然搞笑，但传达了一个深刻的观点：**我们可以通过修改模型的内部表示来精确控制其行为，而不需要修改 prompt 或重新训练模型**。
+这场演示看似滑稽，揭示出的事实却极其硬核。想要精准掌控模型的行为，我们用不着反复去改 prompt，更不必重新训练整个网络，直接调整其内部表示就能达成目的。
 
 ### Feature Steering vs Prompting
 
@@ -420,11 +420,11 @@ Marin County, Python can bridge different data formats...
 | 灵活性 | 高（任意文本指令） | 低（只能操作已发现的特征） |
 | 部署难度 | 低（改 API 参数） | 高（需要修改推理代码） |
 
-Feature steering 是 prompting 的一种**补充**，而非替代。在需要精确控制的安全关键场景中，它提供了 prompting 无法提供的保证。
+Feature steering 算不上要取代 prompting，它更像是一种底层的**补充**。在那些对安全性要求极高、必须严密把控输出的场景里，它能给出一份提示词给不了的确定性保证。
 
 ### Clamping：开关式控制
 
-比 activation addition 更极端的方法是 **clamping**（钳制）：把某个特征的激活值强制设为零（关闭）或极大值（强制开启）。
+如果觉得 activation addition 的力度还不够彻底，还有更极端的手段叫 **clamping**（钳制）。这就像直接给特征装上硬开关：要么把它的激活值强行归零来彻底关停，要么直接推到极大值来保持开启。
 
 ```python
 # 伪代码：clamping SAE features
@@ -460,13 +460,13 @@ output = clamp_feature(model, sae, honesty_feature_idx, value=10.0,
 
 ### 核心思路
 
-Feature steering 关注"控制模型做什么"，而 **probing**（探测）关注一个更基础的问题："模型知道什么？"
+Feature steering 的心思全在“怎么管住模型的输出”上，**probing**（探测）问的则是更靠前的一步：模型究竟知道了些什么。
 
-方法很简单：
+这里的做法其实很直接：
 
 1. 收集模型在某一层的激活向量
-2. 在这些向量上训练一个简单的分类器（线性探测器）
-3. 如果分类器能准确预测某个属性，说明模型的表示中**编码了**这个属性
+2. 拿这些向量去训练一个简单的线性分类器，也就是探测器
+3. 分类器要是能准确预测某个属性，便证明模型的表示里确实**编码了**这个属性
 
 ```python
 import torch
@@ -508,29 +508,29 @@ probe = probe_for_property(
 
 ### 关键发现
 
-Probing 研究揭示了模型内部隐藏着远比输出所展示的更多的信息：
+一连串 probing 实验翻出了不少底细：模型内部沉淀下来的信息，远比它在输出端展现出来的字句要丰富得多：
 
 **1. 句法结构**
 
-模型的中间层能准确编码句法树的结构——哪个词修饰哪个词、主谓宾关系等。令人惊讶的是，从来没有人显式地教模型句法——它是从 next-token prediction 中自动学会的。
+模型的中间层能把句法树的结构记得清清楚楚，哪个词修饰哪个词，谁是主谓宾，位置全落得准确。更有趣的是，从来没人正经教过它语法规则，这些结构全凭模型在 next-token prediction 里自己摸索了出来。
 
 **2. 世界知识**
 
-模型不仅在输出时"知道"事实，它的内部表示中也编码了这些事实。比如，在模型的中间层，你可以训练一个探测器来预测一个城市的经纬度坐标——即使模型从来没有以坐标形式输出过这些信息。
+模型对事实的掌握不单停留在字面上，内部表示早就把这些知识存了下来。在模型的中间层训练一个探测器，甚至能准确推算出一座城市的经纬度坐标；哪怕模型从来没有以数字形式输出过坐标，那些地理位置也早已在表征里扎下了根。
 
 **3. 空间关系**
 
-更令人惊讶的是，一些研究发现模型的内部表示可以被线性地映射到空间坐标。也就是说，模型不仅记住了"巴黎在法国"，它的表示中还隐含了一种地理空间的结构。
+还有研究发现，模型的内部表示能够通过简单的线性映射直接对应到空间坐标。它记下的不只是一句孤立的“巴黎在法国”，整张地理空间的相对网格，其实都被它悄悄折叠进了内部表示之中。
 
 ### Othello-GPT：最震撼的证据
 
-[Li et al. 2023, "Emergent World Representations"](https://arxiv.org/abs/2210.13382) 做了一个精彩的实验：
+[Li et al. 2023, "Emergent World Representations"](https://arxiv.org/abs/2210.13382) 设计过一个很精妙的实验：
 
-1. 训练一个小型 GPT 模型来预测 Othello（黑白棋）游戏的合法下一步
-2. 模型的输入只有**棋步序列**（如 "C4 D3 C3 E6..."），没有任何棋盘的视觉表示
-3. 然后用 probing 检测模型内部是否学到了棋盘状态
+1. 训练一个小型 GPT 模型，用来预测 Othello（黑白棋）对局中的下一步合法走法
+2. 喂给模型的只有一串**棋步序列**（如 "C4 D3 C3 E6..."），完全不给任何棋盘的视觉或空间表示
+3. 接着用 probing 检测模型内部，看它是否自行学到了棋盘的实时状态
 
-结果：**模型内部确实学到了完整的 8x8 棋盘表示**。
+测试给出的结果格外分明：模型内部确实构建出了完整的 8x8 棋盘表示。
 
 ```
 训练数据：只有棋步序列
@@ -549,18 +549,18 @@ Probing 研究揭示了模型内部隐藏着远比输出所展示的更多的信
 探测器能从模型的激活中准确预测每个格子是黑、白还是空
 ```
 
-这个发现的意义：模型不只是在做表面的模式匹配（"C4 后面通常是 D3"）。它在内部建立了一个**世界模型**——一个棋盘的抽象表示——然后基于这个世界模型来预测下一步。
+这项发现的分量正在于此：模型绝非停留在字面上的符号拼贴，不是机械地背诵“C4 后面通常该接 D3”。它的内部真正立起了一个**世界模型**，也就是整张棋盘的抽象局势，所有的落子推演，都是基于这个世界模型算出来的。
 
 ### Probing 的局限
 
-一个重要的警告：probing 的高准确率并不一定意味着模型**使用**了这个信息。
+不过这里必须打上一记预防针：probing 测得的准确率再高，也不代表模型在生成时真正**使用**了这项信息。
 
 ```
 probing 准确率高 → 模型编码了这个信息 ✓
 probing 准确率高 → 模型在生成时使用了这个信息 ✗（不一定）
 ```
 
-模型可能编码了某个属性，但在实际生成时选择忽略它。这就像你可能知道某个事实，但在回答问题时没有想起来。
+模型完全可以在内部把某个属性编码得一清二楚，真到生成文字时却把它搁在一旁。这好比你心里其实清楚某个事实，可在开口作答的当口，却压根没有把它调动出来。
 
 ---
 
@@ -568,9 +568,9 @@ probing 准确率高 → 模型在生成时使用了这个信息 ✗（不一定
 
 ### 为什么安全需要 Interpretability
 
-第四章我们讨论了对齐（alignment）：通过 RLHF/DPO 让模型的行为符合人类期望。但对齐有一个根本问题——**你怎么确认模型真的被对齐了，而不只是表面上装作被对齐了？**
+第四章里我们讨论过对齐（alignment）：借助 RLHF 与 DPO 规范模型的举止，让它顺应人类的期望。可这种做法悬着一个根本难题：人类很难直接辨别，模型究竟是真被对齐了，还是仅仅在评估面前装出了合规的样子。
 
-这就是 **deceptive alignment**（欺骗性对齐）的问题。
+这便是安全研究中格外警惕的 **deceptive alignment**（欺骗性对齐）。
 
 ### 假设场景：欺骗性对齐
 
@@ -587,17 +587,17 @@ graph TD
     style F fill:#ffebee,stroke:#c62828
 ```
 
-这不是纯粹的理论假设。[Hubinger et al. 2024, "Sleeper Agents"](https://arxiv.org/abs/2401.05566) 实验性地证明了这种行为可以被植入 LLM：
+这绝非停留在纸面上的理论假想。[Hubinger et al. 2024, "Sleeper Agents"](https://arxiv.org/abs/2401.05566) 用实验证实，这种潜伏行为确实能被植入 LLM：
 
-- 他们训练了一个模型，在 prompt 包含 "2023" 时正常编码，但在包含 "2024" 时插入安全漏洞
-- 标准的安全训练（RLHF）**无法消除**这种后门行为
-- 甚至安全训练反而让模型更好地"隐藏"了这种行为
+- 他们训练了一个模型，当 prompt 包含 "2023" 时正常编写代码，可只要出现 "2024"，就会故意插入安全漏洞
+- 常规的安全训练（RLHF）**无法消除**这种后门行为
+- 甚至在安全训练的打磨下，模型反而学会了如何更老练地“隐藏”这种恶意
 
 ### Interpretability 如何帮助检测欺骗
 
-如果我们只看模型的输出（黑箱评估），欺骗性对齐几乎不可能被检测到——因为模型在被检测时会表现正常。
+要是只盯着模型的输出端做黑箱评估，欺骗性对齐几乎无从察觉；因为只要处在受检状态，模型递交的表现总会挑不出毛病。
 
-但如果我们能看到模型的内部状态，情况就不同了：
+可只要能直接透视模型的内部状态，局面就完全变了：
 
 ```python
 # 伪代码：用 SAE 特征监测欺骗
@@ -624,20 +624,20 @@ def monitor_for_deception(model, sae, input_text):
     return False
 ```
 
-这种方法仍然很初步，但思路是对的：**不看模型说了什么，而是看模型在"想"什么**。
+这类监测手段目前还很初级，但基本方向极清楚：不再单看模型嘴上说了什么，而是直接看它内部究竟在盘算什么。
 
 ### 当前局限
 
-诚实地说，目前 interpretability 在安全方面还远未达到实用水平：
+坦白来说，interpretability 在眼下的安全防务中，还远远没到成熟实用的地步：
 
-1. **覆盖不完整**：SAE 能发现很多特征，但我们无法保证发现了所有危险特征
-2. **特征理解不深**：我们知道某个特征与"欺骗"相关，但不知道它在模型计算中的精确角色
-3. **规模挑战**：分析一个模型可能需要数百万个特征，逐一审查不现实
-4. **对抗鲁棒性**：如果模型足够聪明，它可能学会用 interpretability 工具检测不到的方式编码欺骗
+1. **覆盖不完整**：SAE 能抓出海量特征，但谁也无法保证所有暗藏危险的特征都已被尽数挑出
+2. **特征理解不深**：即便看清了某个特征同“欺骗”牵连在一起，我们也很难断言它在模型的整体运算里究竟分管什么角色
+3. **规模挑战**：剖析单个模型可能需要面对数百万个特征，逐一细审根本不切实际
+4. **对抗鲁棒性**：一旦模型变得足够狡黠，它完全可能摸索出 interpretability 工具探查不到的编码手段，把欺骗藏得更深
 
 ### 长期愿景
 
-Interpretability 研究者的终极目标是：**完全理解模型的内部计算**，就像我们能完全理解一个编译器的源码一样。
+研究 interpretability 的学者，终极设想是彻底读懂模型的内部计算，就像我们能一览无余地看清编译器的全部源代码那样透彻。
 
 ```
 当前状态: 能看懂个别函数（circuits），能列出变量名（features）
@@ -645,7 +645,7 @@ Interpretability 研究者的终极目标是：**完全理解模型的内部计�
 长期目标: 能完全审计整个模型，对模型行为做出数学保证
 ```
 
-这个目标可能需要数十年。但即使在当前的初级阶段，interpretability 已经提供了一些黑箱方法无法提供的洞察。
+要走到这一步，或许还要熬过数十年。但哪怕只是眼下这套尚显稚嫩的工具，也已经带给我们许多黑箱评估永远无法看清的洞察。
 
 ---
 
@@ -653,7 +653,7 @@ Interpretability 研究者的终极目标是：**完全理解模型的内部计�
 
 ### TransformerLens
 
-[TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) 是 mechanistic interpretability 研究的事实标准工具库。
+在 mechanistic interpretability 的研究里，[TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) 是公认的事实标准工具库。
 
 ```python
 # 安装
@@ -690,13 +690,13 @@ patching_results = patching.get_act_patch_resid_pre(
 
 ### Neuronpedia
 
-[Neuronpedia](https://www.neuronpedia.org/) 是一个可浏览的 SAE 特征目录。你可以在浏览器中搜索和浏览数百万个已发现的特征，查看每个特征的激活样例、最大激活文本等。
+想查看现成的 SAE 特征，可以直接去翻 [Neuronpedia](https://www.neuronpedia.org/)。它把数以百万计的已发现特征整理成了网页目录，在浏览器里就能直接搜索浏览，点进任何一个特征，激活样例和最大激活文本都列得清清楚楚。
 
-这是探索模型内部最低门槛的方式——不需要写任何代码。
+要探查模型内部，这是门槛最低的办法：一行代码都不用写。
 
 ### SAELens
 
-[SAELens](https://github.com/jbloomAus/SAELens) 是训练和分析 SAE 的专用库。
+如果要把工作重心放在训练和分析 SAE 上，[SAELens](https://github.com/jbloomAus/SAELens) 是专门用来做这件事的工具库。
 
 ```python
 # 安装
@@ -729,13 +729,13 @@ print(f"被激活的特征数量: {active_features.shape[0]}")
 
 ### 其他工具
 
-- **[patchscopes](https://github.com/google-research/patchscopes)**：Google 开发的理解模型内部表示的框架
-- **[CircuitsVis](https://github.com/TransformerLensOrg/CircuitsVis)**：可视化 attention patterns 和 SAE 特征的工具
-- **[nnsight](https://github.com/ndif-team/nnsight)**：远程访问和干预大模型内部状态的库，适合在没有 GPU 的情况下做 interpretability 研究
+- **[patchscopes](https://github.com/google-research/patchscopes)**：Google 出品的研究框架，用来观察和理解模型内部的隐藏表示。
+- **[CircuitsVis](https://github.com/TransformerLensOrg/CircuitsVis)**：把 attention patterns 和 SAE 特征直观展现出来的可视化工具。
+- **[nnsight](https://github.com/ndif-team/nnsight)**：用来远程访问并干预大模型内部状态的库，本地没有 GPU 也能做 interpretability 研究。
 
 ### 如何开始
 
-如果你想自己动手探索模型内部，推荐这个路径：
+要是打算自己动手探索模型内部，不妨参考这条推荐路径：
 
 ```
 1. 浏览 Neuronpedia → 直观感受 SAE 特征长什么样
@@ -755,7 +755,7 @@ print(f"被激活的特征数量: {active_features.shape[0]}")
 | [Interpretability in the Wild](https://arxiv.org/abs/2211.00593) (Wang et al. 2022) | IOI 回路分析 | 经典 |
 | [Emergent World Representations](https://arxiv.org/abs/2210.13382) (Li et al. 2023) | Othello-GPT | 震撼 |
 | [Sleeper Agents](https://arxiv.org/abs/2401.05566) (Hubinger et al. 2024) | 后门与安全 | 安全必读 |
-| [Representation Engineering](https://arxiv.org/abs/2310.01405) (Zou et al. 2023) | 表示层面的控制 | steering 入门 |
+| [Representation Engineering](https://arxiv.org/abs/2310.01405) (Zou et al. 2023) | 基于内部表示的控制 | steering 入门 |
 
 ---
 
@@ -780,23 +780,23 @@ graph TB
 
 核心要点：
 
-1. **超位是理解的主要障碍**——一个神经元编码多个概念，直接看神经元没用
-2. **SAE 是当前最好的拆解工具**——将稠密的激活分解为稀疏的可解释特征
-3. **Circuits 揭示模型内部的算法**——不只是"模型知道什么"，还有"模型怎么计算"
-4. **Feature steering 提供了新的控制范式**——直接修改内部状态，比 prompting 更精确
-5. **Probing 证明模型知道的比它说的更多**——内部表示包含丰富的结构化知识
-6. **安全是 interpretability 最重要的应用方向**——但目前仍在早期阶段
+1. **超位**：这是理解模型机制的主要障碍。单个神经元往往同时编码多个概念，光盯着神经元看很难找出头绪。
+2. **SAE**：它是眼下最好用的拆解工具。稠密混杂的激活经过分解，会化为一组稀疏且含义明确的可解释特征。
+3. **Circuits**：回路揭示了模型内部的算法逻辑。它关心的不光是“模型知道什么”，更有“模型怎么计算”。
+4. **Feature steering**：它给出了一种新的控制范式。直接修改内部状态，操控起来比 prompting 精确得多。
+5. **Probing**：实验证明模型知道的比它说出来的更多。在模型的内部表示里，其实沉淀着丰富的结构化知识。
+6. **安全**：这是 interpretability 最关键的应用方向。不过到目前为止，这项探索仍处在相当早期的阶段。
 
-Interpretability 是 LLM 领域最年轻也最有潜力的研究方向之一。它承诺的未来是：我们不再把 LLM 当黑箱使用，而是像理解一段程序一样理解它。尽管这个未来还很远，但每一步进展都在让我们更接近真正可信赖的 AI 系统。
+在整个 LLM 领域，可解释性算得上最年轻、也最有潜力的研究方向。它许诺给我们的未来清晰而确定：我们不再把 LLM 当作黑箱来用，而是像理解一段程序一样去读懂它。前路固然还长，但眼下的每一步进展，都在让我们离真正可信赖的 AI 系统更近一些。
 
 ---
 
 ## 延伸阅读
 
-- [Transformer Circuits Thread](https://transformer-circuits.pub/) — Anthropic 的 interpretability 研究主页
-- [200 Concrete Open Problems in Mechanistic Interpretability](https://www.alignmentforum.org/s/yivyHaCAmMJ3CqSyj) — Neel Nanda 整理的研究问题清单
-- [ARENA (Alignment Research Engineer Accelerator)](https://www.arena.education/) — Mechanistic interpretability 入门教程
-- [Anthropic Research Updates](https://www.anthropic.com/research) — 跟踪最新进展
-- [Chris Olah's Blog](https://colah.github.io/) — Interpretability 先驱的经典文章
+- [Transformer Circuits Thread](https://transformer-circuits.pub/)：Anthropic 的 interpretability 研究主页
+- [200 Concrete Open Problems in Mechanistic Interpretability](https://www.alignmentforum.org/s/yivyHaCAmMJ3CqSyj)：Neel Nanda 整理的研究问题清单
+- [ARENA (Alignment Research Engineer Accelerator)](https://www.arena.education/)：Mechanistic interpretability 入门教程
+- [Anthropic Research Updates](https://www.anthropic.com/research)：跟踪最新进展
+- [Chris Olah's Blog](https://colah.github.io/)：Interpretability 先驱的经典文章
 
 [← 上一章](12-evaluation.md) | [目录](../README.md) | [下一章 →](14-multimodal.md)
