@@ -1,5 +1,5 @@
 site_name: Thinking in LLM
-site_description: 从 next-token prediction 的本质出发，理解 LLM 的思维机制 / Understand LLM thinking from the first principle of next-token prediction.
+site_description: A first-principles guide to how LLMs compute, their capability boundaries, and modern system engineering design.
 site_url: https://yingwang.github.io/thinking-in-llm/
 repo_url: https://github.com/yingwang/thinking-in-llm
 repo_name: yingwang/thinking-in-llm
@@ -11,7 +11,7 @@ use_directory_urls: true
 
 theme:
   name: material
-  language: zh
+  language: en
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -49,12 +49,12 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/yingwang
   alternate:
-    - name: 中文
-      link: /thinking-in-llm/
-      lang: zh
     - name: English
-      link: /thinking-in-llm/en/
+      link: /thinking-in-llm/
       lang: en
+    - name: 中文
+      link: /thinking-in-llm/zh/
+      lang: zh
 
 markdown_extensions:
   - admonition
@@ -65,7 +65,7 @@ markdown_extensions:
   - mdx_truly_sane_lists
   - toc:
       permalink: true
-      permalink_title: 链接到此节
+      permalink_title: Link to this section
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.details
@@ -103,24 +103,6 @@ plugins:
         - zh
 
 nav:
-  - 中文:
-    - 首页: README.md
-    - 大纲: OUTLINE.md
-    - 第 1 章 — 一切都是续写: chapters/01-next-token.md
-    - 第 2 章 — Attention 是信息路由: chapters/02-attention.md
-    - 第 3 章 — 规模涌现: chapters/03-scaling.md
-    - 第 4 章 — 从预训练到对齐: chapters/04-alignment.md
-    - 第 5 章 — 真正擅长什么: chapters/05-strengths.md
-    - 第 6 章 — 硬伤: chapters/06-limitations.md
-    - 第 7 章 — 幻觉的本质: chapters/07-hallucination.md
-    - 第 8 章 — 推理还是模仿: chapters/08-reasoning.md
-    - 第 9 章 — Prompt 是编程: chapters/09-prompting.md
-    - 第 10 章 — 知识注入: chapters/10-knowledge.md
-    - 第 11 章 — Agent: chapters/11-agents.md
-    - 第 12 章 — 评估: chapters/12-evaluation.md
-    - 第 13 章 — 可解释性: chapters/13-interpretability.md
-    - 第 14 章 — 多模态: chapters/14-multimodal.md
-    - 第 15 章 — 未来: chapters/15-future.md
   - English:
     - Home: en/README.md
     - Outline: en/OUTLINE.md
@@ -140,6 +122,24 @@ nav:
     - Ch. 13 — Interpretability: en/chapters/13-interpretability.md
     - Ch. 14 — Multimodal: en/chapters/14-multimodal.md
     - Ch. 15 — Future: en/chapters/15-future.md
+  - 中文:
+    - 首页: README.md
+    - 大纲: OUTLINE.md
+    - 第 1 章 — 一切都是续写: chapters/01-next-token.md
+    - 第 2 章 — Attention 是信息路由: chapters/02-attention.md
+    - 第 3 章 — 规模涌现: chapters/03-scaling.md
+    - 第 4 章 — 从预训练到对齐: chapters/04-alignment.md
+    - 第 5 章 — 真正擅长什么: chapters/05-strengths.md
+    - 第 6 章 — 硬伤: chapters/06-limitations.md
+    - 第 7 章 — 幻觉的本质: chapters/07-hallucination.md
+    - 第 8 章 — 推理还是模仿: chapters/08-reasoning.md
+    - 第 9 章 — Prompt 是编程: chapters/09-prompting.md
+    - 第 10 章 — 知识注入: chapters/10-knowledge.md
+    - 第 11 章 — Agent: chapters/11-agents.md
+    - 第 12 章 — 评估: chapters/12-evaluation.md
+    - 第 13 章 — 可解释性: chapters/13-interpretability.md
+    - 第 14 章 — 多模态: chapters/14-multimodal.md
+    - 第 15 章 — 未来: chapters/15-future.md
 
 copyright: |
   Copyright &copy; 2026 Ying Wang —
