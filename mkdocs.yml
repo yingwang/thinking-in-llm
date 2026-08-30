@@ -104,7 +104,7 @@ plugins:
 
 nav:
   - English:
-    - Home: en/README.md
+    - Home: index.md
     - Outline: en/OUTLINE.md
     - Glossary: en/GLOSSARY.md
     - Ch. 1 — Everything Is Continuation: en/chapters/01-next-token.md
