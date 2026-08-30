@@ -6,9 +6,9 @@
 
 > "An LLM without external knowledge is like a brilliant person with amnesia — great at thinking, terrible at remembering."
 
-LLM 的训练数据有截止日期，它的参数空间有容量上限，它的上下文窗口有长度限制。当你的应用需要模型回答"它不知道的事情"时——你需要**注入知识**。
+LLM 的训练数据总有截止日期，内部参数放不下无穷无尽的事实，上下文窗口也受制于长度。当业务需要模型回答它原本不知道的事情时，唯一能走的路就是**注入知识**。
 
-**核心论点：RAG、Fine-tuning 和 Long Context 是三种本质不同的知识注入方式，各有适用场景。选错了方式，不是效果差的问题，是方向错的问题。**
+核心论点很明确：RAG、Fine-tuning 与 Long Context 是三种走法完全不同的知识注入路线，各有各的去处。选错了方式，从来不只是效果打点折扣，而是从一开始就走错了方向。
 
 ---
 
@@ -16,7 +16,7 @@ LLM 的训练数据有截止日期，它的参数空间有容量上限，它的�
 
 ### 一个考试类比
 
-理解三种方式最好的类比是考试：
+要理解这三种方式的区别，最贴切的比方是考试：
 
 | 方式 | 类比 | 知识存在于 | 更新成本 |
 |------|------|-----------|---------|
@@ -36,7 +36,7 @@ flowchart LR
     G --> A[回答]
 ```
 
-**核心思想**：不把知识塞进模型，而是在需要时去查。
+**核心思想**：不把知识硬塞进模型，而是在需要的时候再去查阅。
 
 ```python
 # RAG 的最简实现
@@ -56,12 +56,12 @@ def rag_answer(question: str, documents: list[str]) -> str:
     return call_llm(prompt)
 ```
 
-**优点**：知识可以实时更新；可以追溯来源（citations）；不需要重新训练模型。
-**缺点**：依赖检索质量；增加延迟；检索失败 = 回答失败。
+**优点**：知识库可以随时更新，回答能够清楚追溯出处（citations），而且完全不用重新训练模型。
+**缺点**：回答质量完全受制于检索模块的表现，每次调用都会拉长响应延迟；一旦检索环节落空，整个回答也就跟着失败了。
 
 ### Fine-tuning
 
-**核心思想**：通过额外训练，把知识/行为模式写入模型权重。
+**核心思想**：通过额外的专项训练，把知识与行为模式直接写进模型权重。
 
 ```python
 # Fine-tuning 数据格式（SFT）
@@ -77,12 +77,12 @@ training_data = [
 ]
 ```
 
-**优点**：改变模型的行为/风格/格式；推理时不需要额外检索；延迟低。
-**缺点**：训练成本高；知识更新需要重新训练；容易过拟合。
+**优点**：能够从根本上重塑模型的言语风格、输出格式与交互习惯，线上推理用不着外挂检索，响应延迟很低。
+**缺点**：训练本身的开销很大，知识一旦发生变动就得重新训练，而且很容易出现过拟合。
 
 ### Long Context
 
-**核心思想**：把所有相关信息直接塞进 prompt。
+**核心思想**：不做复杂拆解，把全部需要的参考资料直接塞进 prompt。
 
 ```python
 # Long context 的朴素实现
@@ -96,14 +96,14 @@ def answer_with_full_context(question: str, all_docs: str) -> str:
     return call_llm(prompt)  # 可能消耗 100K+ tokens
 ```
 
-**优点**：最简单——不需要检索管线，不需要训练；所有信息都在上下文中。
-**缺点**：贵（按 token 计费）；有长度限制；存在"中间遗忘"（lost in the middle）问题。
+**优点**：工程上最为直截了当：省去了检索管线的搭建，免去了漫长的模型训练，所有需要的材料全在当下的上下文里一览无余。
+**缺点**：调用开销贵，每次都要按 token 数量买单；窗口本身有长度上限，模型面对超长文本时还容易出现“中间遗忘”（lost in the middle）的问题。
 
 ---
 
 ## 10.2 RAG 深入
 
-RAG 是最常用的知识注入方式。让我们拆解它的每一个环节。
+给大模型注入知识，RAG 是最常用的法子。整条流水线环环相扣，不妨把其中的每一个环节都拆解开来看。
 
 ### 完整 RAG Pipeline
 
@@ -132,7 +132,7 @@ flowchart TB
 
 ### Embedding：把文本变成向量
 
-Embedding 模型把一段文本映射到一个高维向量空间中，语义相近的文本在向量空间中距离相近。
+Embedding 模型的任务，是把一段文本映射到高维向量空间里。只要文本的语义相近，它们在空间里对应的位置就会挨得很近。
 
 ```python
 from openai import OpenAI
@@ -158,14 +158,14 @@ print(cosine_sim(v1, v2))  # ~0.95（非常相似）
 print(cosine_sim(v1, v3))  # ~0.30（不相关）
 ```
 
-好的 embedding 模型需要：
-- **区分度**：相似文本近，不相似文本远
-- **鲁棒性**：同义换词、语序变化不应显著改变向量
-- **跨语言能力**：如果你的数据是多语言的
+一个好的 embedding 模型，通常要在几件事上立得住：
+- **区分度**：意思相近的文本要挨得足够近，不相干的文本要推得足够远。
+- **鲁棒性**：哪怕替换了同义词或者调换了语序，算出来的向量也不该产生过大偏差。
+- **跨语言能力**：如果手头的数据包含多种语言，模型就得能把不同语种里的同一种意思拉到一块。
 
 ### Chunking：最被低估的工程决策
 
-Chunking 是把长文档切成小块的过程。这个看似简单的步骤，往往决定了 RAG 系统的上限。
+所谓 Chunking，就是把长文档切成一个个小块。这道切分的步骤看似简单，往往却决定了整个 RAG 系统的上限。
 
 ```python
 # 策略 1: 固定大小切分（简单但粗暴）
@@ -209,29 +209,29 @@ def semantic_chunks(text: str) -> list[str]:
 
 | Chunk 太小 | Chunk 太大 |
 |-----------|-----------|
-| 丢失上下文（"他"指代谁？） | 稀释相关性（一大段里只有一句有用） |
-| 检索精度高但召回信息不完整 | 检索到了但 LLM 要在长文本中找答案 |
+| 丢失上下文（“他”指代谁） | 关键信息被稀释（一大段里只有一句有用） |
+| 检索精度高，但召回的信息不完整 | 检索命中了，LLM 却要在长文本中费力翻找答案 |
 | 适合精确事实查询 | 适合需要完整论述的问题 |
 
-**实践建议**：先从 500-1000 token 的 chunk 开始，带 10-20% 的 overlap，然后根据评估结果调整。
+**实践建议**：不妨先从 500 到 1000 token 的 chunk 起步，带上 10% 到 20% 的 overlap，后续再对照评估结果逐步调整。
 
 ### 向量搜索：HNSW vs IVF
 
-向量检索的核心问题：在百万级向量中快速找到最相似的 top-K。精确搜索（暴力比对）的时间复杂度是 O(n)，不可接受。所以我们用近似最近邻（ANN）算法。
+向量检索要解决的核心难题，是如何在百万级的向量海里，飞快挑出最相似的 top-K 个。如果逐一做暴力比对的精确搜索，时间复杂度高达 O(n)，在线上服务中根本无法承受。退而求其次，近似最近邻（ANN）算法成了标准出路。
 
 **HNSW（Hierarchical Navigable Small World）**：
-- 构建多层图结构，每层是上一层的"快捷通道"
-- 搜索时从顶层开始，逐层细化
-- 优点：搜索快（毫秒级）、召回率高
-- 缺点：内存占用大（全部向量 + 图结构都在内存）
-- 适合：百万级以下的数据集
+- 构建多层图结构，上层图充当下层图的“快捷通道”。
+- 搜索时自顶层切入，逐层向下收窄范围。
+- 优点：搜索速度快至毫秒级，召回率高。
+- 缺点：内存开销大，全部向量与图结构都要常驻内存。
+- 适合：百万级以下的数据集。
 
 **IVF+PQ（Inverted File Index + Product Quantization）**：
-- IVF：先把向量空间聚类，搜索时只在相关聚类中查找
-- PQ：把高维向量压缩为短码，减少存储和计算
-- 优点：内存效率高，可处理亿级数据
-- 缺点：召回率略低于 HNSW
-- 适合：大规模数据集
+- IVF：先将向量空间做聚类切分，搜索时只在邻近的聚类簇里查找。
+- PQ：把高维向量压缩成短编码，大幅减轻存储与计算开销。
+- 优点：内存利用率高，可以应对亿级规模的数据。
+- 缺点：召回率略低于 HNSW。
+- 适合：大规模数据集。
 
 ```python
 # 使用 FAISS 构建向量索引
@@ -262,9 +262,9 @@ distances, indices = index_hnsw.search(
 
 ### 混合搜索：向量 + 关键词
 
-纯向量搜索的短板：对**精确匹配**（产品名、错误码、人名）不擅长。BM25（经典关键词搜索）的短板：不理解语义（"如何减肥"和"减重方法"是不同的关键词）。
+纯向量搜索有自己的软肋：遇到产品名、错误码、人名这类需要**精确匹配**的内容，它往往力不从心。经典的 BM25 关键词搜索同样有死穴：它读不懂语义。“如何减肥”与“减重方法”分明是一回事，在它眼里却是两串互不相干的词。
 
-解决方案：两者结合。
+应对的法子很直接：把两路搜索结合起来。
 
 ```python
 # 混合搜索的伪代码
@@ -296,9 +296,9 @@ def hybrid_search(query: str, top_k: int = 10) -> list[Document]:
 
 ### Reranker：精排
 
-向量搜索和 BM25 都是"双塔模型"——query 和 document 独立编码，然后比较向量。这快，但粗糙。
+向量搜索与 BM25 本质上都属于“双塔模型”。它们把 query 和 document 各自独立编码，完成之后再去比对两者的向量。这条路子确实飞快，只是挑出来的结果难免有些粗糙。
 
-Cross-encoder reranker 把 query 和 document 拼在一起输入，让模型看到它们的**交互**，给出更精确的相关性分数。
+Cross-encoder reranker 换了另一种思路。它把 query 与 document 拼接在一起输入，让模型看清两者之间的每一处**交互**，算出来的匹配得分自然精确得多。
 
 ```python
 # 使用 cross-encoder 重排序
@@ -318,17 +318,17 @@ def rerank(query: str, documents: list[str], top_n: int = 5) -> list[str]:
     return [doc for doc, _ in ranked[:top_n]]
 ```
 
-**为什么不直接用 cross-encoder 搜索？** 因为太慢。Cross-encoder 需要把 query 和每个文档拼在一起过一遍模型。100 万文档就要跑 100 万次。所以实践中总是：先用快速方法（向量/BM25）粗选 top-100，再用 cross-encoder 精排 top-10。
+至于为什么不直接拿 cross-encoder 来做全量搜索，原因全在一个慢字。Cross-encoder 需要把 query 和每一篇文档拼接起来跑一遍模型，遇到 100 万篇文档，就得实打实跑上 100 万次。所以在实际工程中总是分两步走：先用向量或 BM25 这类快速方法粗选出 top-100，再交给 cross-encoder 精排挑出 top-10。
 
 ---
 
 ## 10.3 RAG 优化
 
-基础 RAG pipeline 搭好之后，有很多优化手段。
+把一套基础的 RAG pipeline 搭建起来只是开了个头。真要让它在实际场景中运转得当，往后多得是值得细细打磨的优化手段。
 
 ### Query Expansion：改善检索入口
 
-用户的查询往往不够精确，或者和文档中的表述不匹配。
+用户的查询往往不够精确。提问者随手写下的字句，要么漏掉了关键信息，要么很难恰好对上文档里的具体表述。
 
 ```python
 def expand_query(original_query: str) -> list[str]:
@@ -355,7 +355,7 @@ def expand_query(original_query: str) -> list[str]:
 
 ### HyDE：假设文档嵌入
 
-一个巧妙的技巧：不直接用 query 去搜索，而是先让 LLM 生成一个"假设的回答"，用这个回答的 embedding 去搜索。
+这里有个巧妙的办法：先不急着用 query 直接搜索，而是让 LLM 预先写出一份“假设的回答”，再用这份回答的 embedding 去做检索。
 
 ```python
 def hyde_search(query: str, vector_store) -> list[str]:
@@ -374,7 +374,7 @@ def hyde_search(query: str, vector_store) -> list[str]:
     return results
 ```
 
-**为什么有效？** Query 和 document 在语义空间中的"形态"不同——query 是问句，document 是陈述。HyDE 把 query 转化为陈述形式，缩小了这个"形态差异"。
+这套做法之所以管用，在于 query 与 document 在语义空间里的“形态”原本就不同：query 是问句，document 是陈述。HyDE 把 query 转化成了陈述形式，恰好缩小了两者之间的这种“形态差异”。
 
 参考论文：[Precise Zero-Shot Dense Retrieval without Relevance Labels](https://arxiv.org/abs/2212.10496) (Gao et al. 2022)
 
@@ -417,7 +417,7 @@ class SmallToBigRetriever:
 
 ### Agentic RAG：让模型决定是否检索
 
-传统 RAG 每次都检索。但有些问题不需要检索（"1+1=?"），有些需要多次检索（"比较 A 公司和 B 公司的财务状况"）。
+传统的 RAG 不论遇到什么输入，都会照例去库里检索一遍。可实际面对的问题大不相同：像“1+1=？”这类算式完全不需要检索，而换作“比较 A 公司和 B 公司的财务状况”，又往往需要多次检索才能给出答案。
 
 ```python
 def agentic_rag(question: str) -> str:
@@ -469,7 +469,7 @@ def agentic_rag(question: str) -> str:
 
 ### 什么时候应该 Fine-tune
 
-一个关键的认知：**Fine-tuning 的目的是改变行为，不是注入事实**。
+动手做微调之前，得先认清一件事：Fine-tuning 的用处在于改变模型的行为方式，而不是给它灌入事实。
 
 ```
 ✅ 适合 fine-tuning 的场景：
@@ -486,7 +486,7 @@ def agentic_rag(question: str) -> str:
 
 ### SFT（Supervised Fine-tuning）
 
-最直接的方式：准备 instruction-response 对，让模型学习。
+这是最直截了当的微调方式：备好一批成对的指令与回答（instruction-response 对），让模型照着样例一步步去学。
 
 ```python
 # 使用 OpenAI fine-tuning API
@@ -521,9 +521,9 @@ response = client.chat.completions.create(
 
 ### LoRA / QLoRA：参数高效微调
 
-Full fine-tuning 修改模型所有参数，成本很高。LoRA（Low-Rank Adaptation）只修改一小部分参数。
+Full fine-tuning 会把模型的全部参数通通改上一遍，算力与显存成本都高得吓人。LoRA（Low-Rank Adaptation）换了个思路，只动其中极小的一部分。
 
-**核心思想**：不直接修改权重矩阵 W，而是添加一个低秩分解 ΔW = BA，其中 B 和 A 的维度远小于 W。
+**核心思想**：不去直接改动原有的权重矩阵 W，而是在旁边加上一个低秩分解项 ΔW = BA，其中的 B 和 A 维度远比 W 小得多。
 
 ```python
 # 使用 HuggingFace PEFT + TRL 做 LoRA fine-tuning
@@ -571,15 +571,15 @@ trainer = SFTTrainer(
 trainer.train()
 ```
 
-**QLoRA** 更进一步：基础模型用 4-bit 量化加载，只训练 LoRA 参数。一块 24GB 的消费级 GPU 就能 fine-tune 70B 的模型。
+**QLoRA** 走得还要更远一些：基础模型先用 4-bit 量化加载进显存，训练时只去更新那几处 LoRA 参数。单凭一块 24GB 的消费级 GPU，就能把 70B 的大模型 fine-tune 起来。
 
 ### Fine-tuning 的常见错误
 
-1. **数据太少**：少于 100 条很难有效果。建议至少 500-1000 条高质量样本。
-2. **数据质量差**：100 条高质量数据 > 10000 条低质量数据。每条数据都应该是"你希望模型输出的理想回答"。
-3. **过拟合**：训练 loss 很低但效果变差——模型死记了训练数据，丧失了泛化能力。
-4. **任务定义错误**：用"教事实"的心态做 fine-tuning（应该用 RAG）。
-5. **评估指标错误**：只看 loss 不看实际输出质量。
+1. **数据太少**：样本少于 100 条很难见出成效，手头通常至少要备上 500 到 1000 条高质量数据。
+2. **数据质量差**：100 条高质量数据胜过 10000 条粗糙数据。写进训练集的每一条，都应当是“你希望模型输出的理想回答”。
+3. **过拟合**：训练 loss 压得很低，实际输出却越来越糟；模型只是死记硬背了训练数据，把泛化能力丢了个干净。
+4. **任务定义错误**：抱着“教事实”的心态硬做 fine-tuning，可这原本该交给 RAG。
+5. **评估指标错误**：眼睛只盯着 loss 的数字，从不去看模型实际生成的回答质量。
 
 ---
 
@@ -594,15 +594,15 @@ trainer.train()
 | Gemini 1.5 Pro | 2M tokens |
 | Llama 3.1 | 128K tokens |
 
-128K tokens 大约等于一本 300 页的书。2M tokens 大约等于 10 本书。
+128K tokens 摊开来看，差不多能装下一本 300 页的书；若是撑到 2M tokens，吞吐的便足足抵得上 10 本书的体量。
 
 ### Long Context 的诱惑和陷阱
 
-**诱惑**：直接把所有文档塞进 prompt，不需要 RAG pipeline，不需要 chunking，不需要向量数据库。简单！
+**诱惑**：直接把所有文档塞进 prompt 里，省去了搭 RAG pipeline 的工夫，不用切 chunk，也不必张罗向量数据库，省事得让人很难不动心。
 
 **陷阱 1：Lost in the Middle**
 
-[Liu et al. 2023](https://arxiv.org/abs/2307.03172) 的研究发现：当相关信息在长上下文的**中间位置**时，模型性能显著下降。模型更擅长利用开头和结尾的信息。
+[Liu et al. 2023](https://arxiv.org/abs/2307.03172) 的研究发现，只要所需的信息落在长上下文的**中间位置**，模型的性能就会大幅跌落。比起腰部的内容，模型显然更擅长抓住开头与结尾的信息。
 
 ```
 信息位置:     [开头] ← 性能好
@@ -627,15 +627,15 @@ long_context_cost_per_query = 100_000 / 1_000_000 * 2.50  # $0.25
 
 **陷阱 3：延迟**
 
-处理 100K tokens 的延迟远高于处理 1K tokens。在用户交互场景中，这个差异很明显。
+处理 100K tokens 带来的延迟，远比处理 1K tokens 沉重得多。一旦放到需要实时交互的场景里，用户便能立刻体会到这种等待的差距。
 
 ### 什么时候 Long Context 是正确选择
 
-尽管有这些缺点，Long Context 在某些场景下是最优的：
+即便有这些短板，放在某些特定场景下，Long Context 依然是最好的选择：
 
-- **文档数量少，每次查询都需要全局理解**（如分析一份合同的所有条款）
-- **快速原型**——先用 long context 验证可行性，再决定是否投资 RAG pipeline
-- **上下文之间有强依赖**——RAG 的 chunking 会切断这些依赖
+- **文档数量少，每次查询都需要全局理解**（比如分析一份合同里的所有条款）。
+- **快速原型**：先用 long context 验证想法通不通，再决定要不要花本钱去搭 RAG pipeline。
+- **上下文之间有强依赖**：内容前后紧密交织，若是硬用 RAG 切成 chunk，反倒会割裂这些依赖关系。
 
 ---
 
@@ -666,7 +666,7 @@ flowchart TD
 
 ### 组合使用的实际案例
 
-现实世界的系统往往**三者结合**：
+真正落地的工程系统，往往会把**三者结合**起来用：
 
 ```
 客户服务系统:
@@ -684,14 +684,14 @@ flowchart TD
 
 ### 一个简单的决策清单
 
-在选择方式之前，回答这些问题：
+在敲定方案之前，先在心里把这几个问题答清楚：
 
-1. **知识更新频率？** 每天 → RAG；每月 → 都行；几乎不变 → Fine-tune 或 Long Context
-2. **需要引用来源吗？** 是 → RAG（天然支持 citation）
-3. **需要改变模型行为吗？** 是 → Fine-tune
-4. **文档总量多大？** < 100K tokens → Long Context；> 100K → RAG
-5. **延迟要求？** 严格 → Fine-tune（无额外检索）；宽松 → RAG
-6. **预算？** 每次查询都传完整文档太贵 → RAG
+1. **知识更新频率？** 每天都在变，选 RAG；按月更新，哪种都行；几乎常年不变，选 Fine-tune 或 Long Context。
+2. **需要引用来源吗？** 只要答案必须给出明确出处，就选 RAG（它天然支持 citation）。
+3. **需要改变模型行为吗？** 要规范模型的输出风格与格式，选 Fine-tune。
+4. **文档总量多大？** 小于 100K tokens 可以直接用 Long Context；超过 100K tokens，选 RAG。
+5. **延迟要求？** 对响应时间卡得很严，选 Fine-tune（省去了额外的检索步骤）；要求宽松，选 RAG。
+6. **预算？** 每次查询把整份文档全带上太贵，选 RAG。
 
 ---
 
@@ -699,7 +699,7 @@ flowchart TD
 
 ### 语义相似 = 向量距离近
 
-Embedding 把文本映射到一个高维空间。在这个空间中，意思相近的文本离得近，意思无关的文本离得远。
+Embedding 把文本投射到一个高维空间里。在这个空间中，意思相近的文本彼此靠拢，毫无关联的内容则各自离得很远。
 
 ```
 高维空间中的示意（降到 2D 展示）:
@@ -715,7 +715,7 @@ Embedding 把文本映射到一个高维空间。在这个空间中，意思相�
 
 ### Contrastive Learning：推近拉远
 
-Embedding 模型通常用**对比学习**训练：
+训练 Embedding 模型最常用的手法是**对比学习**：
 
 ```
 训练信号:
@@ -727,28 +727,28 @@ Embedding 模型通常用**对比学习**训练：
 - ("如何学 Python", "今日股市行情")    → 拉远
 ```
 
-数学上，常用的损失函数是 InfoNCE：
+落到数学形式上，最常用的损失函数是 InfoNCE：
 
 $$\mathcal{L} = -\log \frac{\exp(\text{sim}(q, d^+) / \tau)}{\sum_{i} \exp(\text{sim}(q, d_i) / \tau)}$$
 
-其中 $\tau$ 是温度参数，$d^+$ 是正样本，$d_i$ 包含正样本和所有负样本。
+式中的 $\tau$ 是温度参数，$d^+$ 代表正样本，$d_i$ 则包含了正样本与所有的负样本。
 
 ### 为什么 Cosine Similarity 有效
 
-Cosine similarity 衡量两个向量的方向是否一致，忽略长度：
+Cosine similarity 衡量的是两个向量在方向上是否一致，而把各自的长度撇在一旁：
 
 $$\cos(\theta) = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{a}| \cdot |\mathbf{b}|}$$
 
-为什么方向比长度重要？因为 embedding 编码的是**语义方向**。一段长文本和一段短文本如果说的是同一件事，它们的向量方向应该一致，但长度（模）可能不同。
+方向之所以压过长度，是因为 Embedding 本质上编码的是**语义方向**。只要说的是同一件事，长篇大论与三两句短语在空间里指引的方向就该一致，哪怕两者的向量模长截然不同。
 
 ### 选择 Embedding 模型
 
-[MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) 是选择 embedding 模型的参考。但要注意：
+挑选模型时，[MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) 是最常用的参考基准，但榜单排名不能照单全收，实际选型时有几件事必须看清：
 
-1. **领域匹配**：通用 benchmark 上的第一名不一定适合你的领域。医疗、法律、代码等垂直领域可能需要专门的 embedding 模型。
-2. **维度和速度**：高维向量更有表达力，但存储和搜索成本更高。768 维通常是个好的平衡点。
-3. **多语言**：如果你的数据是中文，确保选择的模型在中文上有好的表现（BAAI/bge 系列、Cohere multilingual）。
-4. **是否需要训练自己的？** 大多数情况下，off-the-shelf 模型就够了。只有当你的领域术语非常专业（如半导体制造术语）时，才考虑训练自己的 embedding 模型。
+1. **领域匹配**：在通用榜单上拔得头筹的模型，换到具体业务里未必顺手。医疗、法律、代码这类垂直行业，往往需要专门针对该领域微调过的模型。
+2. **维度和速度**：向量维数越高，表达能力越丰富，存储和检索的成本也越高。768 维通常是个不错的平衡点。
+3. **多语言**：如果处理的是中文数据，务必确认选用的模型在中文语境下表现过硬，比如 BAAI/bge 系列与 Cohere multilingual。
+4. **是否需要训练自己的？** 开箱即用的现成（off-the-shelf）模型足以应付绝大多数场景。只有当业务里充斥着极其冷僻的专有术语（例如半导体制造）时，才值得考虑训练专用的 embedding 模型。
 
 ---
 
@@ -777,24 +777,24 @@ graph TB
 
 核心要点：
 
-1. **三种方式本质不同**——RAG 是检索，Fine-tuning 是训练，Long Context 是填充
-2. **RAG 是最通用的选择**——支持更新、支持引用、成本可控
-3. **Fine-tuning 改变行为，不注入事实**——这是最常见的误用
-4. **Long Context 简单但有代价**——成本高、Lost in the Middle、延迟大
-5. **Chunking 是 RAG 的隐形杀手**——花在 chunking 策略上的时间永远不嫌多
-6. **混合搜索 > 纯向量搜索**——BM25 + 向量 + Reranker 是当前最佳实践
-7. **现实系统往往三者结合**——不是非此即彼的选择
+1. **三种方式本质不同**：RAG 走的是运行时检索，Fine-tuning 靠的是重塑权重，Long Context 则是往上下文里硬填。
+2. **RAG 是最通用的选择**：知识随时能更新，答案处处可溯源，调用成本也始终落在可控区间内。
+3. **Fine-tuning 改变行为，不注入事实**：微调管的是说话风格与行为模式，拿它去死记具体事实，是工程上最普遍的误用。
+4. **Long Context 简单但有代价**：省去了搭建检索管道的麻烦，却要扛下高昂的 token 账单、长文本中间的记忆盲区（Lost in the Middle）与居高不下的响应延迟。
+5. **Chunking 是 RAG 的隐形杀手**：切分粒度直接决定了检索质量的上限，花在分块策略上的打磨工夫永远不算多。
+6. **混合搜索 > 纯向量搜索**：BM25 负责精准命中，向量负责语义泛化，最后用 Reranker 压阵精排，这套组合是眼下的最佳实践。
+7. **现实系统往往三者结合**：生产环境下的架构从来不是非此即彼的单选题，把三者按需拼装起来才是常态。
 
 ---
 
 ## 延伸阅读
 
-- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) — Lewis et al. 2020, RAG 原始论文
-- [Lost in the Middle](https://arxiv.org/abs/2307.03172) — Liu et al. 2023
-- [Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)](https://arxiv.org/abs/2212.10496) — Gao et al. 2022
-- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) — Hu et al. 2021
-- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314) — Dettmers et al. 2023
-- [MTEB: Massive Text Embedding Benchmark](https://arxiv.org/abs/2210.07316) — Muennighoff et al. 2022
-- [FAISS](https://github.com/facebookresearch/faiss) — Facebook 的向量搜索库
+- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401)：Lewis et al. 2020，RAG 原始论文
+- [Lost in the Middle](https://arxiv.org/abs/2307.03172)：Liu et al. 2023
+- [Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)](https://arxiv.org/abs/2212.10496)：Gao et al. 2022
+- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)：Hu et al. 2021
+- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)：Dettmers et al. 2023
+- [MTEB: Massive Text Embedding Benchmark](https://arxiv.org/abs/2210.07316)：Muennighoff et al. 2022
+- [FAISS](https://github.com/facebookresearch/faiss)：Facebook 的向量搜索库
 - [LangChain RAG Tutorial](https://python.langchain.com/docs/tutorials/rag/)
-- [HuggingFace TRL](https://github.com/huggingface/trl) — 训练语言模型的工具库
+- [HuggingFace TRL](https://github.com/huggingface/trl)：训练语言模型的工具库
