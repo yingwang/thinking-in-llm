@@ -2,79 +2,114 @@
 
 **English**: [English](../en/chapters/12-evaluation.md)
 
-# 第十二章：系统评估的度量衡
+# 第十二章：评估——最被低估的环节
 
 > "If you can't measure it, you can't improve it. If you don't measure it, you'll definitely break it."
 
-在前几章中，我们系统剖析了模型的表征机制、能力边界、提示词编程、知识注入与智能体拓扑。然而在工业级系统研发中，存在一个常被忽视却决定成败的根本命题：
+写到这里，我们已经讨论了模型怎么"想"、能力的边界、prompt、知识注入、agent。这些都是构建侧的工具。但有一个问题我们一直回避：
 
-**如何以科学、客观、可量化的工程手段证明系统的有效性与稳定性？**
+**你怎么知道你做的东西是好的？**
 
-工程师凭借主观直觉（Vibe Check）调整 Prompt 后便仓促上线，数日后生产环境暴露大量非预期长尾缺陷，由于缺乏量化基准，整个系统陷入无法定位回溯的失控状态。
+这是 LLM 工程里最容易被跳过的环节。一个常见的现象：工程师调好一个 prompt，凭"vibe check"觉得不错，发布，三天后用户报告各种翻车——而工程师不知道是哪一次改动引入的问题，因为根本没有基线。
 
-大语言模型的非确定性采样、高维开放输出空间以及长尾失效特征，使得评估的复杂度远超传统确定性软件。
+LLM 系统的非确定性、开放输出空间、长尾失败模式，让评估变得**比传统软件难得多**。但也正因为难，**做了的人有显著优势**。
 
 本章核心论点：
 
-1. **缺乏完备评测（Eval）的系统仅是一个脆弱的演示原型（Demo）**：无法支持严谨的工程迭代；
-2. **通用基准评测（Public Benchmarks）无法替代垂直业务度量**：必须构建与真实业务分布严格对齐的评估套件；
-3. **大模型充当裁判（LLM-as-a-Judge）具备扩展性优势但也内生结构性偏差**：必须配套校准与监督机制；
-4. **践行评估驱动开发（Eval-Driven Development）**：在调整系统参数或 Prompt 之前，必须先确立量化度量衡。
+1. **没有 eval 的 LLM 系统，就是一个 demo**——能演示，无法迭代
+2. **Vibe check 不够、benchmark 也不够**——你需要的是**任务特定的 eval**
+3. **LLM-as-judge 是把双刃剑**——它能 scale 评估，但有结构性偏差
+4. **评估应该驱动开发**——先写 eval，再调系统
+
+读完这一章，你会有一个可落地的评估方法论：从如何选指标，到怎么构建 eval set，再到怎么把 eval 嵌入到 CI 里防止退化。
 
 ---
 
-## 12.1 概率生成系统评估的本质挑战
+## 12.1 为什么 LLM 评估这么难
 
-### 确定性软件与高维生成系统的范式鸿沟
+### 传统软件 vs LLM 系统
 
 ```
-传统确定性软件工程:
-  状态输入 X → 确定性算法 f(X) → 规范化输出 Y
-  正确性判定: Y == Expected_Y (布尔逻辑断言)
-  回归测试: 单元测试用例完全覆盖
+传统软件:
+  输入 → 函数 → 输出
+  正确性 = 输出是否符合规约
+  评估 = 单元测试
 
-大语言模型概率系统:
-  高维输入 X → 条件概率采样 P(Y|X; W) → 开放连续文本 Y
-  正确性判定: 语义等价性、格式合规度、事实忠实度的多维概率度量
-  回归测试: 统计分布层面的置信度评估与长尾风险测绘
+LLM 系统:
+  输入 → LLM → 输出
+  正确性 = ???
+  评估 = ???
 ```
 
-### 评估复杂度的三大物理根源
+LLM 评估难在三点：
 
-1. **开放输出空间的语义多义性**：同一业务意图在自然语言中存在无限种合法的表述形式，无法通过简单的字符串精确匹配（Exact Match）进行判定；
-2. **采样温度引发的非确定性扩散**：在非零采样温度下，相同输入在不同请求批次中将沿着不同的概率分支演进；
-3. **长尾缺陷的高隐蔽性**：模型可能在 95% 的常见分布上表现卓越，但在剩余 5% 的极端边界上发生严重幻觉。
+**1. 输出是开放空间**
+
+普通函数：输入 1+1 → 输出必须是 2。
+LLM：输入"总结这篇文章" → 输出可以是无数种"对的"摘要。
+
+你不能用 `assertEqual(output, expected)` 来测，因为根本没有唯一的 expected。
+
+**2. 非确定性**
+
+Temperature > 0 时，同一个输入每次输出都不同。即使 temperature = 0，模型版本升级、batch 变化、硬件浮点差异都可能让输出变。
+
+**3. 长尾失败**
+
+LLM 在 95% 的情况下表现良好，剩下 5% 会以**意想不到**的方式失败。这 5% 不会被随机抽查发现，但会被生产环境的真实用户精准触发。
 
 ```mermaid
 flowchart LR
-    subgraph 传统测试["传统软件测试"]
-        T1["状态空间离散有限"] --> T2["构造边缘断言即可完全覆盖"]
+    subgraph 传统["传统软件"]
+        T1["失败模式有限"] --> T2["写测试覆盖即可"]
     end
-    subgraph 概率评测["概率模型评测"]
-        L1["语义空间连续且高维<br>长尾缺陷不可穷举"] --> L2["构建分层评测集<br>+ 分布式持续监控"]
+    subgraph LLM["LLM 系统"]
+        L1["失败模式无限<br>且不可枚举"] --> L2["需要分布式监控<br>+ 持续 eval"]
     end
     
     style T1 fill:#c8e6c9
     style L1 fill:#ffcdd2
 ```
 
-### 工业界三大伪评估反模式
+### 三个 anti-pattern
 
-- **反模式一：主观直觉巡检（Vibe Check）**：仅凭人工随机构造 3 至 5 个样例肉眼观察，极易被表面流畅度误导；
-- **反模式二：教条套用公开基准（Public Benchmark Gaming）**：过分迷信 MMLU、GSM8K 等学术跑分，脱离了具体业务场景的特定语义分布；
-- **反模式三：完全依赖生产用户反馈（Post-hoc Monitoring Only）**：用户行为信号存在严重的滞后性与高噪声，且大量受挫用户往往选择无声流失而非主动反馈。
+我见过的最常见的"假评估"：
+
+**Anti-pattern 1：Vibe check**
+
+```
+"我试了几个例子，看着挺好的，发布。"
+```
+
+问题：你测的几个例子大概率是简单 case，模型本来就不会出错。真正的边界 case 你想不到。
+
+**Anti-pattern 2：依赖通用 benchmark**
+
+```
+"我们的模型在 MMLU 上得 85 分。"
+```
+
+问题：MMLU、GPQA、HumanEval 这些 benchmark 测的是模型本身的能力，不是你**这个具体应用**的表现。一个 MMLU 高分模型在你的客服场景上完全可能翻车——比如它太学究、太长篇大论。
+
+**Anti-pattern 3："最终用户会告诉我们"**
+
+```
+"上线后看用户反馈来迭代。"
+```
+
+问题：用户反馈的信号噪声很大，且滞后。等你收集到统计显著的信号，可能已经流失了大量用户。而且用户**不会告诉你他们没说出口的不满**——他们会默默换一家。
 
 ---
 
-## 12.2 系统工程评测的四层拓扑
+## 12.2 评估的层次
 
-工业级评估体系应当具备清晰的垂直分层架构：
+不要把所有评估混在一起谈。它们有层次，每层目标不同。
 
 ```mermaid
 flowchart TD
-    L1["Level 1: 单元原子评估 (Unit Evals)<br>单次 Prompt 与单步生成质量"] --> L2["Level 2: 组件管线评估 (Component Evals)<br>RAG 召回精度、Tool 协议解析率"]
-    L2 --> L3["Level 3: 端到端系统评估 (System Evals)<br>全局任务达成率、端到端时延与成本"]
-    L3 --> L4["Level 4: 生产在线监控 (Online Observability)<br>全量流量指标采集与长尾抽样审计"]
+    L1["L1: 单元评估<br>单次模型调用"] --> L2["L2: 组件评估<br>RAG、工具使用、单步 agent"]
+    L2 --> L3["L3: 系统评估<br>端到端 user journey"]
+    L3 --> L4["L4: 生产监控<br>真实用户、真实流量"]
     
     style L1 fill:#c8e6c9
     style L2 fill:#fff9c4
@@ -82,251 +117,669 @@ flowchart TD
     style L4 fill:#f8bbd0
 ```
 
-| 评测层次 | 核心度量目标 | 触发频次 | 自动化水平 |
-|---|---|---|:---:|
-| **L1 单元评估** | 提示词语法合规性、单步抽取准确度 | 每次代码/Prompt 提交 (Git Hook) | 100% 自动 |
-| **L2 组件评估** | 向量检索 Recall@K、重排 MRR、Tool 传参合规率 | 每次基础设施/数据索引更新 | 100% 自动 |
-| **L3 系统评估** | 多轮对话目标达成率、端到端业务转化率 | 生产发布前门禁流水线 (CI/CD) | 混合自动化 |
-| **L4 在线监控** | 用户显式赞踩、P99 时延分布、Token 消耗率 | 全天候持续采集 (Real-time Stream) | 自动采集 + 抽样复核 |
+| 层次 | 评估对象 | 频率 | 自动化程度 |
+|------|---------|------|-----------|
+| L1 单元评估 | 单个 prompt / 单次调用 | 每次改 prompt | 完全自动 |
+| L2 组件评估 | RAG 检索准确率、工具调用成功率 | 每次改组件 | 完全自动 |
+| L3 系统评估 | 端到端任务完成率 | 每次发布 | 部分自动 + 人工 |
+| L4 生产监控 | 真实流量上的指标 | 持续 | 自动 + 抽样人工 |
+
+很多团队只做 L1（甚至不做），就发布到 L4（生产）。中间的 L2、L3 缺失，导致改了一个 prompt 没人知道整体系统好坏。
 
 ---
 
-## 12.3 评测数据集（Eval Set）的工程构建
+## 12.3 构建 Eval Set：最重要的一步
 
-评测数据集是整个评估系统的物理基准。评测集构建的严密程度直接决定了量化指标的置信度。
+### Eval set 是什么
 
-```mermaid
-graph TD
-    Data["评测集样本来源拓扑"] --> S1["生产真实脱敏流量 (黄金源，占比 50%)"]
-    Data --> S2["历史线上故障案例库 (防回归，占比 25%)"]
-    Data --> S3["对抗性边界构造样本 (探针测试，占比 15%)"]
-    Data --> S4["受控合成数据 (冷启动扩展，占比 10%)"]
-    
-    style S1 fill:#c8e6c9
-    style S2 fill:#ffcdd2
-    style S3 fill:#fff9c4
-    style S4 fill:#e1bee7
-```
-
-### 样本来源分级体系
-
-1. **生产真实流量脱敏清洗（最高置信度）**：从真实生产日志中抽样，剔除 PII 隐私数据后固化为基准用例；
-2. **线上故障用例库（回归防御）**：凡生产环境发生用户投诉或系统崩溃，必须立即提取输入并纳入防御测试集；
-3. **专家级对抗构造（边界应力测试）**：由领域专家设计包含矛盾前提、诱导性误导、间接注入攻击的鲁棒性样本；
-4. **受控合成样本（冷启动支持）**：在系统初期由强基座模型生成多样化样本，但需在后续迭代中逐步被真实数据置换。
-
----
-
-## 12.4 判别器（Judge）的技术选型矩阵
-
-如何定义输出的合法性与质量？应根据任务类型选用适配的判定机制：
-
-```mermaid
-flowchart TD
-    Type{"任务输出特征"}
-    Type -->|枚举值/类别标签| J1["确定性精确匹配 (Exact Match)"]
-    Type -->|JSON / DSL / 代码| J2["形式化 Schema 与 AST 校验"]
-    Type -->|事实问答 / 实体抽取| J3["关键事实抽取 + 集合交并比"]
-    Type -->|开放式生成 / 创意润色| J4["LLM-as-a-Judge 结构化打分"]
-    Type -->|高风险合规决策| J5["人工专家双盲复核 (Human Review)"]
-    
-    style J1 fill:#c8e6c9
-    style J2 fill:#c8e6c9
-    style J3 fill:#fff9c4
-    style J4 fill:#bbdefb
-    style J5 fill:#f8bbd0
-```
-
-### 六类判别机制技术对比
-
-1. **精确匹配（Exact Match）**：针对输出空间有限的分类任务，计算成本为零，结果具备绝对确定性；
-2. **形式化结构校验（Schema / AST Validation）**：此项是工程中最被低估的高效校验手段：计算开销极低，却能精准拦截绝大多数结构崩溃；
-3. **事实元提取比对（Fact Extraction & Match）**：将模型输出拆解为原子事实三元组，与标准答案集合计算 Jaccard 相似度；
-4. **模型裁判（LLM-as-a-Judge）**：引入高阶模型依据结构化评分准则（Rubric）输出量化分数与推导演进依据；
-5. **成对胜率比较（Pairwise Elo Tournament）**：对候选输出进行盲测对抗比对，规避单点绝对打分的绝对标度漂移；
-6. **专家人工双盲审计（Human-in-the-loop）**：作为黄金基准，用于标定前序自动判别器的统计信度。
-
----
-
-## 12.5 LLM-as-a-Judge 的偏差机理与纠偏工程
-
-大模型作为自动化裁判有效解决了评估规模化扩展的瓶颈，但在使用时必须在算法层面纠正其固有的系统性认知偏差：
-
-```mermaid
-graph TD
-    B["LLM-as-a-Judge 固有偏差"] --> B1["位置偏置 (Position Bias)"]
-    B --> B2["长度偏置 (Verbosity Bias)"]
-    B --> B3["家族偏好 (Self-Enhancement Bias)"]
-    B --> B4["修辞掩盖 (Style-over-Substance)"]
-    
-    B1 --> C1["纠偏方案: 调换次序，双向采样求均值"]
-    B2 --> C2["纠偏方案: 注入明确规约，惩罚冗余输出"]
-    B3 --> C3["纠偏方案: 跨模型家族交叉裁判"]
-    B4 --> C4["纠偏方案: 强制前置生成评分推导演进 (CoT)"]
-```
-
-### 生产级裁判调用标准范式
+一个 eval set 就是一组**有代表性的输入 + 对应的"判断标准"**。它是你的"ground truth"。
 
 ```python
-def robust_llm_judge(
-    query: str, 
-    candidate_response: str, 
-    reference_ground_truth: str,
-    evaluator_client
-) -> dict:
-    """
-    具备偏差纠正与结构化推演的生产级裁判实现
-    """
-    evaluation_rubric = """
-    请作为严格的学术评审员评估候选回答。
-    
-    【核心评估维度】
-    1. 事实忠实度 (0-2分): 是否完全基于参考事实，严禁虚构细节；
-    2. 逻辑完备性 (0-2分): 是否严密覆盖了问题的核心诉求；
-    3. 表述精炼度 (0-1分): 是否剔除了无意义的客套与冗余。
-    
-    【评分规则】
-    - 禁止因回答字数较多而给予额外加分；
-    - 必须首先输出详尽的扣分项推导理由 (Evaluation Trace)，最后输出 JSON 格式得分。
-    """
-    
-    judge_prompt = f"""{evaluation_rubric}
-    
-    【用户问题】: {query}
-    【标准参考】: {reference_ground_truth}
-    【待评回答】: {candidate_response}
-    
-    请输出评测推导及最终结构化得分：
-    """
-    
-    # 强制启用结构化解析
-    return evaluator_client.generate_structured_score(judge_prompt)
+eval_set = [
+    {
+        "input": "总结这篇关于气候变化的文章: ...",
+        "judge": {
+            "type": "llm_judge",
+            "criteria": ["涵盖主要论点", "不超过 100 字", "中立语气"],
+        }
+    },
+    {
+        "input": "我的订单 #12345 在哪？",
+        "judge": {
+            "type": "exact_match",
+            "expected": "订单 #12345 已发货，预计明天到达。",
+        }
+    },
+    ...
+]
 ```
 
+构建一个好的 eval set 通常比写代码更花时间。但它是**所有后续工作的基础**。
+
+### 怎么收集 eval set 的输入
+
+几个来源，按质量排序：
+
+**1. 真实用户输入（最高质量）**
+
+最好的输入来自实际生产流量。它们反映真实分布、包含真实的边界 case。
+
+```python
+# 从生产日志采样
+sampled = random.sample(production_logs, 200)
+# 人工筛选/标注，去掉 PII
+eval_inputs = clean_and_label(sampled)
+```
+
+如果你还没上线，可以做一个 internal alpha——让公司内部人当用户，收集真实输入。
+
+**2. 真实失败案例（高价值）**
+
+每次生产出问题，把那个输入加进 eval set。这样下次再改系统时，会自动测这个 case 不要回归。
+
+```python
+# 用户报告 bug 后的标准流程
+def add_failure_to_eval(input, expected_behavior):
+    eval_set.append({
+        "input": input,
+        "judge": {"criteria": expected_behavior},
+        "added_reason": "regression: bug from 2026-04-15",
+    })
+```
+
+**3. 对抗性构造（覆盖边界）**
+
+故意构造模型容易出错的输入：
+
+- 模糊 / 多义的问题
+- 包含矛盾信息的问题
+- 超长 context
+- 罕见话题
+- 不同语言、口语 / 方言
+- prompt injection 尝试
+- 越狱尝试
+
+**4. 合成数据（数量但小心质量）**
+
+让一个 LLM 生成 eval 输入。便宜、快，但要警惕：合成数据反映的是 generator LLM 的偏见，不是真实用户。
+
+```python
+prompt = f"""为一个客服 chatbot 生成 50 个不同类型的用户问题。
+要求：
+- 涵盖咨询、投诉、退款、技术问题
+- 包括礼貌的和愤怒的
+- 包括清晰的和模糊的
+- 包括标准书面语和口语
+"""
+```
+
+合成数据适合作为**起步**，但应该尽快被真实数据替换。
+
+### Eval set 的规模
+
+多大才够？经验：
+
+| 阶段 | 推荐规模 | 用途 |
+|------|---------|------|
+| 早期开发 | 20-50 | 快速迭代，找方向 |
+| 上线前 | 200-500 | 系统性测试 |
+| 生产稳定后 | 1000+ | 防回归 + 长尾覆盖 |
+
+注意：**质量 > 数量**。100 个精心挑选、覆盖各种 case 的输入，比 10000 个同质化的随机样本有用得多。
+
 ---
 
-## 12.6 业务维度的关键指标体系设计
+## 12.4 怎么"判断"输出好不好
 
-### 1. RAG 知识检索系统黄金指标
+输入收集到了，下一步是定义"什么是对的输出"。这是 LLM 评估真正的难点。
 
-- **Context Relevance（上下文相关度）**：检索切片与用户意图的信噪比；
-- **Groundedness / Faithfulness（事实忠实度）**：生成回答对检索切片的依赖程度（防止模型擅自外推）；
-- **Answer Relevance（答案切题率）**：生成内容对原始问题的响应完整性。
+按从简单到复杂列出几种 judge 方式：
 
-### 2. 智能体（Agent）系统效能指标
+### Judge 方式 1：精确匹配（exact match）
 
-- **Task Success Rate（任务成功率）**：状态机是否收敛至最终目标；
-- **Trajectory Efficiency（轨迹效率）**：达成目标所需的平均工具调用步数；
-- **Tool Selection Precision（工具选择精确率）**：是否调用了非必要或错误的 API。
+```python
+def exact_match(output, expected):
+    return output.strip() == expected.strip()
+```
 
-### 3. 安全合规双向指标
+**适合**：输出空间小且明确。如分类、提取（只有有限可能的答案）。
 
-- **Refusal Precision（应拒绝请求的拦截率）**：针对对抗越狱与有害输入的防御率；
-- **False Refusal Rate（安全误杀率）**：正常业务请求被模型误判为敏感内容的比例（防止系统过度防御导致可用性劣化）。
+**不适合**：开放生成。即使语义对，文字也可能完全不一样。
 
----
+### Judge 方式 2：数值/格式校验
 
-## 12.7 评估驱动开发（Eval-Driven Development）
+```python
+def is_valid_json(output):
+    try:
+        json.loads(output)
+        return True
+    except:
+        return False
+
+def matches_schema(output, schema):
+    try:
+        jsonschema.validate(json.loads(output), schema)
+        return True
+    except:
+        return False
+```
+
+**适合**：结构化输出。这是工程上**最 underrated** 的 eval——简单、便宜、能抓住大量低级错误。
+
+### Judge 方式 3：包含关键事实
+
+```python
+def contains_required_facts(output, required):
+    """检查输出是否提到所有必需的事实"""
+    return all(fact.lower() in output.lower() for fact in required)
+
+# 例子
+eval_item = {
+    "input": "Roger 有 5 个网球，又买了 2 罐每罐 3 个。共多少个？",
+    "judge": {
+        "type": "contains",
+        "required": ["11", "网球"],
+    }
+}
+```
+
+**适合**：QA、推理任务，关心答案是否包含正确事实。
+
+**陷阱**：可能误判。如 "答案不是 11 而是 12" 也包含 "11"。需要更精细。
+
+### Judge 方式 4：结构化提取后再比
+
+```python
+def evaluate_qa(output, expected_answer):
+    # 用一个简单的 LLM 调用提取最终答案
+    extracted = llm.generate(f"""
+    从以下回答中提取最终答案数字：
+    {output}
+    """).strip()
+    return extracted == expected_answer
+```
+
+把"判断模型输出对不对"分成两步：先**提取关键信息**，再**精确匹配**。比直接 LLM-judge 更可靠。
+
+### Judge 方式 5：LLM-as-judge
+
+让另一个 LLM 来评判：
+
+```python
+def llm_judge(input, output, criteria):
+    judge_prompt = f"""
+    用户问题：{input}
+    系统回答：{output}
+    
+    请按以下标准评估这个回答：
+    {criteria}
+    
+    输出 JSON：
+    {{
+      "score": 1-5,
+      "reasons": "...",
+      "passes": true/false
+    }}
+    """
+    return llm.generate(judge_prompt, model="claude-opus-4-7")
+```
+
+**适合**：开放生成、主观评估、复杂多维度判断。
+
+但是——下一节专门谈它的陷阱。
+
+### Judge 方式 6：人工评估
+
+```python
+def human_judge(input, output):
+    return show_to_human(input, output)  # 人来打分
+```
+
+**适合**：金标准。新指标的校准、争议 case、最终验收。
+
+**代价**：慢、贵、有标注者间一致性问题。
+
+### 选型指南
 
 ```mermaid
 flowchart TD
-    Define["1. 固化业务指标与核心 Eval Set"] --> Baseline["2. 运行基线模型并生成首版评分"]
-    Baseline --> FailAnalysis["3. 深入聚类分析全部失败用例 (Failure Mode Analysis)"]
-    FailAnalysis --> Hypothesis["4. 提出优化假设 (重构切片策略 / 调整 Prompt / 增加 Few-shot)"]
-    Hypothesis --> Implement["5. 实施工程改造并在评测集全量回归"]
-    Implement --> Compare{"6. 指标看板对比"}
-    Compare -->|"指标显著提升且无回归"| Merge["7. 固化变更至 Main 主干"]
-    Compare -->|"引发长尾指标劣化"| Reject["8. 阻断回滚，重新分析失败根因"]
-    Merge --> FailAnalysis
-    Reject --> Hypothesis
+    Out{"输出类型？"}
+    Out -->|"封闭/分类"| EM["精确匹配<br>(便宜可靠)"]
+    Out -->|"结构化"| SC["Schema 验证<br>+ 字段检查"]
+    Out -->|"事实性 QA"| Fact["关键事实检查<br>+ 提取后匹配"]
+    Out -->|"开放生成"| Q2{"质量要求？"}
     
-    style Define fill:#c8e6c9
-    style Baseline fill:#fff9c4
-    style Compare fill:#bbdefb
-    style Merge fill:#c8e6c9
-    style Reject fill:#ffcdd2
+    Q2 -->|"快速迭代"| LJ["LLM-as-judge<br>(注意偏差)"]
+    Q2 -->|"高 stakes"| HJ["人工评估<br>(必要时混合)"]
+    
+    style EM fill:#c8e6c9
+    style SC fill:#c8e6c9
+    style Fact fill:#fff9c4
+    style LJ fill:#fff9c4
+    style HJ fill:#bbdefb
 ```
-
-该范式通过客观数据闭环，从根本上消除了主观试错引发的逻辑退化与系统返工。
 
 ---
 
-## 12.8 CI/CD 持续集成门禁与防回归工程
+## 12.5 LLM-as-Judge：威力与陷阱
 
-Prompt 与模型配置的变更必须如同核心底层库一样，接入自动化持续集成流水线：
+### 为什么这个范式重要
+
+LLM-as-judge 解决了一个核心瓶颈：**评估的 scaling**。
+
+人工评估贵——一个标注员一小时也就能评几十个样本。但如果用 LLM 当 judge：
+
+- 速度提升 100x
+- 成本降到几分之一  
+- 能覆盖更多维度（同时评估事实性、流畅度、有用性、安全性）
+
+很多评估管线都是 LLM-as-judge 在跑：MT-Bench、AlpacaEval、Chatbot Arena 的部分自动化、各家公司的内部 eval。
+
+### 已知偏差
+
+但 LLM judge 不是完美的。研究和实践已经发现一些系统性偏差：
+
+**偏差 1：位置偏差（Position bias）**
+
+如果让模型比较两个回答 A 和 B，它倾向于选**第一个**或**第二个**——这个倾向在不同模型间不一样，但都存在。
+
+```python
+# 修正：每对样本都跑两次，A vs B 和 B vs A，取平均
+score_AB = judge(A, B)
+score_BA = judge(B, A)
+final = (score_AB + (1 - score_BA)) / 2
+```
+
+**偏差 2：长度偏差**
+
+LLM judge 倾向于偏好**更长**的回答，即使长不代表好。
+
+```python
+# 修正：明确告诉 judge 不要因为长度打分
+judge_prompt = """
+...请仅根据回答质量打分，不要因为回答更长就给更高分。
+简洁的好回答应该和详细的好回答得到相同的分数。
+"""
+```
+
+**偏差 3：自我偏好**
+
+GPT-4 当 judge 时倾向于偏好 GPT-4 的输出。Claude 当 judge 时偏好 Claude 的输出。
+
+```python
+# 修正：用不同 family 的模型当 judge
+# 测 Claude 输出 → 用 GPT 当 judge
+# 或者用一个第三方模型（如 open-source 模型）
+```
+
+**偏差 4：style over substance**
+
+LLM judge 容易被**好看的格式**欺骗——bullet points、有结构的回答、自信的语气会得高分，即使内容是错的。
+
+**偏差 5：rubric 解读漂移**
+
+不同时间、不同 prompt 措辞下，judge 对同一个 rubric 的解读会有差异。需要校准。
+
+### 怎么用得相对靠谱
+
+```python
+def reliable_llm_judge(input, output):
+    # 1. 用强模型（不要用便宜模型当 judge）
+    judge_model = "claude-opus-4-7"
+    
+    # 2. 给明确的 rubric，不要笼统问"好不好"
+    rubric = """
+    评估以下维度（每项 0-2 分）：
+    - 事实准确性：信息是否正确？
+    - 完整性：是否回答了完整问题？
+    - 简洁性：是否没有冗余？
+    - 安全性：是否避免了有害内容？
+    """
+    
+    # 3. 要求 judge 先给理由再打分（避免直接拍脑袋）
+    judge_prompt = f"""...先给出每项的理由，再给分..."""
+    
+    # 4. 多次采样取均值
+    scores = [judge(input, output, rubric) for _ in range(3)]
+    return mean(scores)
+    
+    # 5. 关键决策时，用人工抽样验证 judge 的可靠性
+```
+
+**最重要的一条**：**LLM judge 必须自己被评估**。定期抽 10-20% 的样本，让人工评估，对比 judge 和人的一致性。一致性显著低（< 80%）就是 judge 出问题了。
+
+---
+
+## 12.6 评估指标的设计
+
+不同任务关心不同指标。一些常见任务的典型指标：
+
+### RAG 系统
+
+```mermaid
+flowchart LR
+    R1["Retrieval 评估"] --> R2["Generation 评估"]
+    
+    R1 -.->|"准确率指标"| M1["Recall@k<br>Precision@k<br>MRR"]
+    R2 -.->|"质量指标"| M2["Faithfulness<br>(回答忠于检索内容?)<br><br>Answer Relevance<br>(回答是否切题?)<br><br>Context Relevance<br>(检索的是相关内容?)"]
+```
+
+| 指标 | 定义 | 怎么测 |
+|------|------|-------|
+| Recall@k | 真实相关文档在 top-k 中的比例 | 需要标注的相关文档 |
+| Precision@k | top-k 中相关文档的比例 | 需要标注 |
+| MRR | 第一个相关文档的位置倒数 | 需要标注 |
+| Faithfulness | 回答中的事实是否都来自检索内容 | LLM-judge 或事实分解 |
+| Answer Relevance | 回答是否切题 | LLM-judge |
+| Context Relevance | 检索结果是否相关 | LLM-judge 或人工 |
+
+工具：[RAGAS](https://github.com/explodinggradients/ragas)、[TruLens](https://github.com/truera/trulens)。
+
+### Agent 系统
+
+| 指标 | 定义 |
+|------|------|
+| Task Success Rate | 任务最终是否完成 |
+| Steps to Completion | 完成任务用了几步（少 = 高效） |
+| Tool Call Accuracy | 调用了正确的工具 |
+| Tool Argument Validity | 工具参数是否合法 |
+| Cost per Task | 完成一个任务的总 API 成本 |
+| Latency P50/P95 | 用户感知的延迟分布 |
+
+### 分类 / 提取任务
+
+经典 ML 指标仍然适用：
+
+- Accuracy、Precision、Recall、F1
+- Confusion matrix
+- Per-class metrics（不要被 macro 平均掩盖小类问题）
+
+### 开放生成
+
+最难定义指标的场景。常见做法：
+
+- **Pairwise comparison**：对两个版本的输出做 A/B 比较，看哪个更好（比单点评分更可靠）
+- **Multi-dimension rubric**：分维度评估（流畅、相关、安全、有用…）
+- **Win rate**：vs 一个 baseline，新版赢的比例
+
+### 安全与合规
+
+- Refusal rate（恰当的拒绝率）
+- False refusal rate（不该拒绝的拒绝率）
+- Harmful content rate
+- PII leakage
+- Prompt injection success rate
+
+不要忘了**双向**指标——既要测"该拒绝的拒绝了"，也要测"不该拒绝的没拒绝"。后者经常被忽视，导致系统过度保守。
+
+---
+
+## 12.7 Eval-Driven Development
+
+### 颠倒顺序
+
+传统 ML/工程开发的顺序：
+
+```
+写代码 → 跑跑看 → 觉得不错 → 写测试（如果有时间的话）
+```
+
+LLM 系统应该反过来：
+
+```
+定义 eval → 跑 baseline → 改进 → 跑 eval → 看是否改进
+```
+
+这就是 **eval-driven development**。它的好处：
+
+1. 先定义"什么是好"，避免只凭感觉判断
+2. 改 prompt 后能立刻知道是变好还是变坏
+3. 不同改动的效果可以量化对比
+4. 不会因为修复某个问题而破坏别的（regression）
+
+### 实战流程
+
+```mermaid
+flowchart TD
+    S1["定义评估指标 + 收集 eval set"] --> S2["跑 baseline<br>(最简单的 prompt)"]
+    S2 --> S3["分析 baseline 失败 case"]
+    S3 --> S4["假设：什么改动可能有帮助?"]
+    S4 --> S5["实施改动"]
+    S5 --> S6["跑 eval"]
+    S6 --> S7{"指标提升？"}
+    S7 -->|"是"| S8["保留改动<br>看下个失败 case"]
+    S7 -->|"否"| S9["放弃改动<br>试别的"]
+    S8 --> S3
+    S9 --> S4
+    
+    style S1 fill:#c8e6c9
+    style S6 fill:#fff9c4
+    style S7 fill:#bbdefb
+```
+
+每次改动都跑 eval，每次决策都基于数据。这个循环看起来慢，但实际上**比"改 prompt 然后凭感觉判断"快得多**——因为它消除了"以为变好其实变差"的反复。
+
+### 错误分析比指标更重要
+
+跑完 eval 看到一个数字（比如 "78% 通过率"），它本身没多少信息量。**重要的是：失败的 22% 是什么样子？**
+
+```python
+# 错误分析的标准流程
+failures = [item for item in eval_results if not item.passed]
+
+# 1. 按失败类型分类
+failure_types = classify_failures(failures)
+# 例如：{
+#   "事实错误": 8,
+#   "格式不对": 5,
+#   "未理解问题": 4,
+#   "工具调用失败": 3,
+#   "拒绝回答": 2,
+# }
+
+# 2. 看每类的代表性 case
+for failure_type, count in failure_types.items():
+    print(f"\n=== {failure_type} ({count}) ===")
+    for case in failures_of_type(failure_type)[:3]:
+        print(case.input, "→", case.output)
+```
+
+错误分析能告诉你：
+
+- **下一步该改什么**（哪类失败最大、最容易修）
+- **这个 prompt 改动会修哪类、可能引入哪类**
+- **是 prompt 的问题，还是模型本身能力不够**
+
+---
+
+## 12.8 Regression Testing：防止退化
+
+### 改 prompt 像改正则表达式
+
+任何改过复杂正则的人都知道：改了一个字符，原本能匹配的东西可能就不匹配了，原本不能匹配的反而匹配了。Prompt 的脆弱性是类似的——可能更糟，因为它影响的是一个开放语言空间。
+
+```python
+# 想象这个场景
+原 prompt: "请简洁回答。"
+改 prompt: "请简洁、礼貌地回答。"
+# 看起来无害的修改
+
+实际效果:
+- 原本简洁的回答 → 变长了（"礼貌"加了套话）
+- 原本拒绝的边界 case → 变得过度礼貌，有时会答应不该答的请求
+- 整体 token 用量 +20%
+```
+
+不跑 eval 你不会知道这些变化。
+
+### CI 集成
+
+把 eval 跑进 CI：
 
 ```yaml
-# .github/workflows/llm-regression-eval.yml
-name: LLM Core Regression Gate
+# .github/workflows/eval.yml
+name: LLM Eval
 on:
   pull_request:
     paths:
-      - 'infra/prompts/**'
-      - 'src/rag_pipeline/**'
+      - 'prompts/**'
+      - 'src/**'
 
 jobs:
-  run-eval-suite:
+  eval:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          
-      - name: Execute Automated Regression Suite
-        run: |
-          python -m eval_runner \
-            --baseline-branch origin/main \
-            --candidate-branch HEAD \
-            --dataset-path ./eval_suites/gold_standard.jsonl \
-            --report-out ./eval_report.json
-            
-      - name: Enforce Strict Quality Gate
-        run: |
-          python -c '
-          import json, sys
-          data = json.load(open("./eval_report.json"))
-          if data["accuracy_delta"] < 0.0 or data["faithfulness_score"] < 0.92:
-              print("❌ 质量门禁未通过: 发现核心指标回归退化")
-              sys.exit(1)
-          print("✅ 质量门禁通过，准予合并")
-          '
+      - uses: actions/checkout@v3
+      - run: python eval/run.py --baseline main --candidate ${{ github.head_ref }}
+      - run: python eval/compare.py --threshold 0.95
+        # 如果新分支的关键指标低于 main 的 95%，CI 失败
 ```
+
+这样改 prompt 之前，自动跑回归。
+
+### Eval set 自身的演化
+
+Eval set 不是写一次就完事——它需要持续维护：
+
+- 每次发现新的失败模式 → 加进 eval set
+- 业务发生变化 → 修改判断标准
+- 模型升级 → 重新校准 LLM judge
+- 用户行为变化 → 替换部分输入为新的代表性样本
+
+> **经验**：eval set 的更新频率应该和代码差不多。不维护的 eval set 几个月内就会和真实分布脱节，给你虚假的安全感。
 
 ---
 
-## 本章小结
+## 12.9 一个完整的 RAG eval pipeline 示范
 
-```mermaid
-graph TB
-    A["系统评估度量衡"] --> B["物理挑战: 开放语义空间 + 长尾非确定性"]
-    A --> C["四层拓扑: 单元 → 组件 → 系统 → 生产监控"]
-    A --> D["判别矩阵: 确定性校验优先，LLM-as-Judge 纠偏"]
+把这一章的内容综合起来，用 RAG 系统做一个完整示范：
+
+```python
+import json
+from dataclasses import dataclass
+
+@dataclass
+class EvalItem:
+    question: str
+    relevant_doc_ids: list  # 标注的相关文档 ID
+    expected_answer_facts: list  # 答案应包含的事实
+
+@dataclass
+class EvalResult:
+    item: EvalItem
+    retrieved_doc_ids: list
+    answer: str
+    metrics: dict
+
+def evaluate_rag_system(eval_set, rag_system):
+    results = []
+    for item in eval_set:
+        # 跑系统
+        retrieved = rag_system.retrieve(item.question)
+        answer = rag_system.generate(item.question, retrieved)
+        
+        # 多维度评估
+        metrics = {
+            # Retrieval 指标（确定性）
+            "recall@5": len(set(retrieved[:5]) & set(item.relevant_doc_ids)) / len(item.relevant_doc_ids),
+            "precision@5": len(set(retrieved[:5]) & set(item.relevant_doc_ids)) / 5,
+            
+            # Answer 指标（部分用 LLM judge）
+            "fact_coverage": fact_coverage(answer, item.expected_answer_facts),
+            "faithfulness": llm_judge_faithfulness(answer, retrieved),
+            "relevance": llm_judge_relevance(answer, item.question),
+            
+            # 系统指标
+            "latency_ms": rag_system.last_latency,
+            "cost_usd": rag_system.last_cost,
+        }
+        
+        results.append(EvalResult(item, retrieved, answer, metrics))
     
-    E["工程方法论"] --> F["评估驱动开发 (EDD): 先立指标，再动代码"]
-    E --> G["CI/CD 自动化门禁: 杜绝 Prompt 隐式回归"]
+    # 聚合
+    return summarize(results)
+
+
+def summarize(results):
+    return {
+        "n": len(results),
+        "avg_recall@5": mean(r.metrics["recall@5"] for r in results),
+        "avg_faithfulness": mean(r.metrics["faithfulness"] for r in results),
+        "avg_relevance": mean(r.metrics["relevance"] for r in results),
+        "p50_latency": median(r.metrics["latency_ms"] for r in results),
+        "p95_latency": percentile(r.metrics["latency_ms"], 95),
+        "total_cost": sum(r.metrics["cost_usd"] for r in results),
+        
+        # 分布分析
+        "low_recall_examples": [r for r in results if r.metrics["recall@5"] < 0.5][:5],
+        "low_faithfulness_examples": [r for r in results if r.metrics["faithfulness"] < 3][:5],
+    }
 ```
 
-核心要点：
+注意几个特征：
 
-1. **没有 Eval 的系统无法实施工程重构**：量化度量衡是摆脱随机试错的唯一路径；
-2. **分层度量组件与全局**：RAG 测三元指标，Agent 测轨迹收敛效率；
-3. **纠正 LLM-as-a-Judge 结构偏差**：通过双向交换、长度抑制与显式推导保障裁判公允；
-4. **将 Eval 固化为 CI 质量门禁**：每一次 Prompt 演进都必须经历确定性的回归校验；
-5. **警惕未知分布外的极端风险**：持续结合线上监控与红队渗透，动态维护评测集的生命力。
+- **多层指标**：retrieval、generation、系统级别都覆盖
+- **混合 judge**：确定性指标（recall）+ LLM judge（faithfulness）
+- **不只看均值**：抽出失败 case 让你能做错误分析
+- **可以加进 CI**：每次改 RAG 系统都跑一遍
 
-在下一章中，我们将进一步深入深度神经网络的内部微观世界：探索机制可解释性（Mechanistic Interpretability）如何穿透黑箱，观测模型内部的表征流动与神经元激活回路。
+---
+
+## 12.10 LLM 评估的边界与未来
+
+最后一节，承认评估方法的局限：
+
+### 1. 你测不到 "unknown unknowns"
+
+任何 eval set 都是**已知失败模式的集合**。生产中真正杀人的，往往是你想都没想到的边界 case。
+
+应对：**生产监控** + **持续的红队测试**（red teaming）—— 让人主动尝试打破系统。
+
+### 2. LLM judge 有上限
+
+当被测系统超过 judge 的能力时，judge 就不可靠了。比如让 GPT-4 judge GPT-5 的输出，结果可能不靠谱。
+
+应对：用比被测系统**更强**的模型当 judge，或者用人工评估。
+
+### 3. Benchmark gaming（刷分）
+
+任何固定的 eval set，被反复迭代久了，模型/系统就会"过拟合"它。指标看起来在涨，但泛化能力没涨。
+
+应对：**hold-out set**（保留一组从不用于迭代的测试集）+ 定期更新 eval set。
+
+### 4. 评估的成本边际
+
+跑一次完整 eval 可能要几十美元和几个小时。如果每次小改动都跑，迭代会变慢。
+
+应对：**分层 eval**——快速 sanity check（几十样本，几秒）+ 完整回归（数百到上千样本，发布前跑）。
+
+---
+
+## 总结
+
+| 问题 | 答案 |
+|------|------|
+| 为什么 LLM 评估难 | 输出开放、非确定性、长尾失败 |
+| Vibe check 够吗 | 不够。它能验证简单 case，无法防退化、无法量化对比 |
+| 通用 benchmark 够吗 | 不够。它们测模型能力，不测你的具体应用 |
+| Eval set 怎么来 | 真实流量 > 失败案例 > 对抗构造 > 合成数据 |
+| 怎么 judge 输出 | 优先用确定性指标；LLM-judge 要校准；高 stakes 用人工 |
+| LLM-judge 的坑 | 位置偏差、长度偏差、自我偏好、style over substance |
+| 应该什么时候做 eval | 在写第一行系统代码之前——eval-driven development |
+| 怎么防 prompt 退化 | Eval 进 CI，每次 PR 自动跑回归 |
+
+下一章我们进入 Part IV——前沿话题。从评估的"黑箱"走向 interpretability：打开模型，看看里面到底在算什么。
 
 ---
 
 ## 延伸阅读
 
-- [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685), Zheng et al., 2023
-- [RAGAS: Automated Evaluation of Retrieval Augmented Generation](https://arxiv.org/abs/2309.15217), Es et al., 2023
-- [G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment](https://arxiv.org/abs/2303.16634), Liu et al., 2023
-- [Holistic Evaluation of Language Models (HELM)](https://arxiv.org/abs/2211.09110), Liang et al., 2022
-- [Measuring Massive Multitask Language Understanding (MMLU)](https://arxiv.org/abs/2009.03300), Hendrycks et al., 2021
+- [Zheng et al., 2023: _Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena_](https://arxiv.org/abs/2306.05685) — LLM-judge 的系统性研究
+- [Es et al., 2023: _RAGAS: Automated Evaluation of RAG_](https://arxiv.org/abs/2309.15217) — RAG 系统的标准评估框架
+- [Chiang & Lee, 2023: _Can Large Language Models Be an Alternative to Human Evaluations?_](https://arxiv.org/abs/2305.01937) — LLM judge 与人评的对比
+- [Liu et al., 2023: _G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment_](https://arxiv.org/abs/2303.16634) — 用 GPT-4 做更对齐人评的自动评估
+- [Hendrycks et al., 2021: _Measuring Massive Multitask Language Understanding (MMLU)_](https://arxiv.org/abs/2009.03300) — 通用能力 benchmark 的代表
+- [Liang et al., 2022: _Holistic Evaluation of Language Models (HELM)_](https://arxiv.org/abs/2211.09110) — 多维度 LLM 评估框架
+- [Chatbot Arena](https://lmsys.org/blog/2023-05-03-arena/) — 用真人 ELO 评测的开放排行榜
 
 [← 上一章](11-agents.md) | [目录](../README.md) | [下一章 →](13-interpretability.md)
-

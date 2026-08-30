@@ -1,5 +1,5 @@
 site_name: Thinking in LLM
-site_description: A first-principles guide to how LLMs compute, their capability boundaries, and modern system engineering design.
+site_description: 从 next-token prediction 的本质出发，理解 LLM 的思维机制 / Understand LLM thinking from the first principle of next-token prediction.
 site_url: https://yingwang.github.io/thinking-in-llm/
 repo_url: https://github.com/yingwang/thinking-in-llm
 repo_name: yingwang/thinking-in-llm
@@ -11,7 +11,7 @@ use_directory_urls: true
 
 theme:
   name: material
-  language: en
+  language: zh
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -49,12 +49,12 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/yingwang
   alternate:
-    - name: English
-      link: /thinking-in-llm/
-      lang: en
     - name: 中文
-      link: /thinking-in-llm/zh/
+      link: /thinking-in-llm/
       lang: zh
+    - name: English
+      link: /thinking-in-llm/en/
+      lang: en
 
 markdown_extensions:
   - admonition
@@ -65,7 +65,7 @@ markdown_extensions:
   - mdx_truly_sane_lists
   - toc:
       permalink: true
-      permalink_title: Link to this section
+      permalink_title: 链接到此节
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.details
@@ -103,25 +103,6 @@ plugins:
         - zh
 
 nav:
-  - English:
-    - Home: index.md
-    - Outline: en/OUTLINE.md
-    - Glossary: en/GLOSSARY.md
-    - Ch. 1 — Everything Is Continuation: en/chapters/01-next-token.md
-    - Ch. 2 — Attention as Information Routing: en/chapters/02-attention.md
-    - Ch. 3 — Emergence at Scale: en/chapters/03-scaling.md
-    - Ch. 4 — From Pretraining to Alignment: en/chapters/04-alignment.md
-    - Ch. 5 — What LLMs Are Good At: en/chapters/05-strengths.md
-    - Ch. 6 — Hard Limitations: en/chapters/06-limitations.md
-    - Ch. 7 — The Nature of Hallucination: en/chapters/07-hallucination.md
-    - Ch. 8 — Reasoning or Mimicry: en/chapters/08-reasoning.md
-    - Ch. 9 — Prompting Is Programming: en/chapters/09-prompting.md
-    - Ch. 10 — Knowledge Injection: en/chapters/10-knowledge.md
-    - Ch. 11 — Agents: en/chapters/11-agents.md
-    - Ch. 12 — Evaluation: en/chapters/12-evaluation.md
-    - Ch. 13 — Interpretability: en/chapters/13-interpretability.md
-    - Ch. 14 — Multimodal: en/chapters/14-multimodal.md
-    - Ch. 15 — Future: en/chapters/15-future.md
   - 中文:
     - 首页: README.md
     - 大纲: OUTLINE.md
@@ -140,6 +121,25 @@ nav:
     - 第 13 章 — 可解释性: chapters/13-interpretability.md
     - 第 14 章 — 多模态: chapters/14-multimodal.md
     - 第 15 章 — 未来: chapters/15-future.md
+  - English:
+    - Home: en/README.md
+    - Outline: en/OUTLINE.md
+    - Glossary: en/GLOSSARY.md
+    - Ch. 1 — Everything Is Continuation: en/chapters/01-next-token.md
+    - Ch. 2 — Attention as Information Routing: en/chapters/02-attention.md
+    - Ch. 3 — Emergence at Scale: en/chapters/03-scaling.md
+    - Ch. 4 — From Pretraining to Alignment: en/chapters/04-alignment.md
+    - Ch. 5 — What LLMs Are Good At: en/chapters/05-strengths.md
+    - Ch. 6 — Hard Limitations: en/chapters/06-limitations.md
+    - Ch. 7 — The Nature of Hallucination: en/chapters/07-hallucination.md
+    - Ch. 8 — Reasoning or Mimicry: en/chapters/08-reasoning.md
+    - Ch. 9 — Prompting Is Programming: en/chapters/09-prompting.md
+    - Ch. 10 — Knowledge Injection: en/chapters/10-knowledge.md
+    - Ch. 11 — Agents: en/chapters/11-agents.md
+    - Ch. 12 — Evaluation: en/chapters/12-evaluation.md
+    - Ch. 13 — Interpretability: en/chapters/13-interpretability.md
+    - Ch. 14 — Multimodal: en/chapters/14-multimodal.md
+    - Ch. 15 — Future: en/chapters/15-future.md
 
 copyright: |
   Copyright &copy; 2026 Ying Wang —
