@@ -2,22 +2,22 @@
 
 **English**: [English](../en/chapters/14-multimodal.md)
 
-# 第十四章：多模态——超越文本
+# 第十四章：多模态，超越文本
 
 > "Once you tokenize it, it's text. The question is just what counts as 'it'."
 
-第一章我们说 LLM 只做一件事：预测下一个 token。本章把这个论点推向极致：**只要能把它变成 token，LLM 就能处理它**——图像、音频、视频、3D 模型、蛋白质序列，原则上都一样。
+第一章里我们提过，LLM 只做一件事：预测下一个 token。这一章要把这个论断推到极致：只要能设法拆成 token，LLM 就能照单全收。不论是图像、音频、视频，还是 3D 模型与蛋白质序列，在原则上全是一回事。
 
-这就是多模态模型的核心思路。它不是"在 LLM 上又装了一个图像模块"，而是**把图像（或音频、视频）转换成 token 序列，喂进同一个 transformer**。一旦你接受这个视角，多模态就不再神秘——它是文本 LLM 的自然延伸。
+这就是多模态模型最核心的底色。它并不是在 LLM 外头生硬地挂载一个图像模块，而是把图像、音频或视频统统转成 token 序列，一股脑塞进同一个 transformer 里面。一旦想通了这层视角，多模态便褪去了神秘感，它无非是文本 LLM 顺理成章的延伸。
 
-本章核心论点：
+全章的核心论点可以概括为四条：
 
-1. **多模态本质就是 tokenize 的扩展**——图像变成视觉 token，音频变成音频 token
-2. **CLIP 是一切的基础**——它教会模型"图像和文本可以共享一个语义空间"
-3. **生成图像/音频的方式根本不同**——主流路径是 diffusion，不是 next-token prediction
-4. **Omni model 是趋势**——一个模型理解和生成所有模态
+1. **多模态本质就是 tokenize 的扩展**：图像化作视觉 token，音频化作音频 token。
+2. **CLIP 是一切的基础**：它教会模型一件事，图像和文本可以安放在同一个语义空间里。
+3. **生成图像/音频的方式根本不同**：主流路线是 diffusion，而不是 next-token prediction。
+4. **Omni model 是趋势**：用同一个模型去理解并生成所有模态。
 
-读完本章，你会理解 GPT-4o 的"看图能力"、Sora 的视频生成、Whisper 的语音识别、Suno 的音乐生成——它们看似不同，背后是同一套思路的不同实现。
+读完这一章，你会看明白 GPT-4o 的“看图能力”、Sora 的视频生成、Whisper 的语音识别与 Suno 的音乐生成。这些系统在产品形态上千差万别，骨子里却只是同一套思路在不同场景下的展开。
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### 文本 token 化的回顾
 
-第一章里我们已经知道：tokenizer 把文本切成离散单元，每个单元映射到一个向量（embedding）。
+第一章里我们已经清楚，tokenizer 负责把文本切成一个个离散的单元，再把每个单元映射成一个向量，也就是 embedding。
 
 ```
 "hello world" 
@@ -35,11 +35,11 @@
   → [vec_hello, vec_world]  (两个 d 维向量)
 ```
 
-这个向量序列就是 transformer 的输入。
+这串排好队的向量序列，就是送进 transformer 的原始输入。
 
 ### 图像怎么变成 token？
 
-最直接的想法：把图像也切成"块"，每块当一个 token。这正是 **Vision Transformer (ViT)** 的做法（Dosovitskiy et al., 2020, [_An Image is Worth 16x16 Words_](https://arxiv.org/abs/2010.11929)）。
+最直截了当的念头，莫过于把整幅画面切成一块块碎片，每一块单独充当一个 token。这正是 **Vision Transformer (ViT)** 当初开辟的路线（Dosovitskiy et al., 2020, [_An Image is Worth 16x16 Words_](https://arxiv.org/abs/2010.11929)）。
 
 ```mermaid
 flowchart LR
@@ -52,20 +52,20 @@ flowchart LR
     style Tok fill:#c8e6c9
 ```
 
-具体步骤：
+具体的拆解步骤并不复杂：
 
-1. **切块（patch）**：把 224×224 的图片切成 14×14 = 196 个小块，每块 16×16 像素
-2. **拉平 + 投影**：每个块 16×16×3 = 768 维，过一个线性层投到 transformer 的 hidden dim
-3. **加位置编码**：让模型知道每个 patch 在原图哪里（图像 patch 没有"自然顺序"）
-4. **送进 transformer**：和文本 token 一样处理
+1. **切块（patch）**：把一张 224×224 像素的图片切成 14×14 = 196 个小块，每块大小为 16×16 像素。
+2. **拉平 + 投影**：每个小块展开为 16×16×3 = 768 维的向量，经过一层线性映射，投射到 transformer 预设的 hidden dim 上。
+3. **加位置编码**：图像切出来的碎片天生没有前后阅读顺序，必须叠加上位置编码，模型才能辨认每个 patch 落在画面的什么方位。
+4. **送进 transformer**：到了这一步，它们就和普通的文本 token 完全平起平坐，一同参与注意力运算。
 
-**核心洞察**：ViT 不需要任何"图像专用"的网络结构（不需要 CNN、不需要卷积）。它把图像当成"二维的 token 序列"，让 transformer 自己学怎么理解。
+**核心洞察**：ViT 身上看不到任何专为图像定制的特殊网络结构，它甩开了卷积，也不依赖经典的 CNN。它只是把整张画面视作一串二维的 token 序列，把理解画面的重任全盘交给了 transformer 自身的注意力机制。
 
-实践证明：当数据足够多时，ViT 在图像任务上能超过经典 CNN。而且——这是关键——**它和文本 transformer 是同一种架构**。
+后来的工程实践表明，只要喂给模型的数据规模足够庞大，ViT 在各项视觉任务上的表现就能稳稳压过传统的 CNN。更要紧的是，它与处理语言的文本 transformer 在底层共享着完全同一套架构。
 
 ### Vision-Language Model：把图文 token 拼在一起
 
-一旦图像也是 token 了，VLM（Vision-Language Model）的设计就显而易见：
+只要图像也化作了 token，视觉语言模型（VLM）的搭建逻辑也就顺理成章地浮出了水面：
 
 ```
 输入: [图像 token1, ..., 图像 token196, 文本 token1, ..., 文本 tokenN]
@@ -89,13 +89,13 @@ flowchart LR
     style LLM fill:#c8e6c9
 ```
 
-GPT-4V、Claude 3、Gemini、LLaVA 都是这种结构的变体。差异在于：
+GPT-4V、Claude 3、Gemini 和 LLaVA，本质上都是围绕这套骨架做出的微调与演变。彼此之间的分野，主要落在几个具体的工程选择上：
 
-- 视觉编码器用什么（ViT、CLIP 的 vision tower、自研编码器）
-- 怎么把图像 token 投影到 LLM 的 embedding 空间（线性层、MLP、cross-attention）
-- 训练数据多少图文对、什么质量
+- 视觉编码器的选型（是用纯粹的 ViT、CLIP 的 vision tower，还是各家自研的编码器）。
+- 图像 token 映射到 LLM 向量空间的手法（是用一层简单的线性层、多层感知机 MLP，还是引入 cross-attention）。
+- 训练所用的图文对在数量和质量上的厚薄。
 
-但**核心思路就是"图像变 token，拼到文本前面"**。当你看到 Claude 能"看图回答"，背后做的就是这件事。
+但万变不离其宗，最底层的逻辑始终是把图像切碎成 token，再规规矩矩地拼在文本的前面。日常使用中你看到 Claude 能对着图片侃侃而谈，后台跑的其实就是这套机制。
 
 ---
 
@@ -103,9 +103,9 @@ GPT-4V、Claude 3、Gemini、LLaVA 都是这种结构的变体。差异在于：
 
 ### 一个简单到震撼的训练目标
 
-2021 年 OpenAI 发表的 CLIP（[_Learning Transferable Visual Models From Natural Language Supervision_](https://arxiv.org/abs/2103.00020)）改变了多模态。它的训练目标简单到不可思议：
+2021 年 OpenAI 拿出的 CLIP（[_Learning Transferable Visual Models From Natural Language Supervision_](https://arxiv.org/abs/2103.00020)），彻底重塑了多模态领域的研究轨迹。它所设定的训练目标，简单得令人有些意外：
 
-> 给一批图文对（image, caption），让"匹配的对"在 embedding 空间里靠近，"不匹配的对"远离。
+> 给一批图文对（image, caption），让匹配的对在 embedding 向量空间里尽量靠近，不匹配的对相互远离。
 
 ```mermaid
 flowchart LR
@@ -143,15 +143,15 @@ labels = arange(N)  # 第 i 张图应该匹配第 i 个 caption
 loss = (cross_entropy(sim, labels) + cross_entropy(sim.T, labels)) / 2
 ```
 
-**这个目标产生了什么？** 一个**共享的语义空间**：图像和文本被映射到同一个向量空间，里面"a dog running on the beach" 这句话的 embedding 和实际"狗在海滩跑步"的图片 embedding 距离很近。
+这样一套训练目标，最终沉淀出了一个**共享语义空间**。在这个统一的向量空间里，图像与文本被映射到了同一处天地：“a dog running on the beach” 这句话的 embedding，与现实里拍着狗在海滩上奔跑的照片 embedding，在空间距离上挨得极近。
 
-### 为什么这是"基石"
+### 为什么这是“基石”
 
-CLIP 的影响远超图像分类：
+CLIP 带来的深远波及，早已远远超出了传统的图像分类范畴：
 
 **应用 1：零样本图像分类**
 
-不需要训练分类器，只需要把候选标签变成文本：
+想要给图片分类，不再需要专门训练分类器，只要把备选标签写成普通的文本：
 
 ```python
 labels = ["a photo of a cat", "a photo of a dog", "a photo of a car"]
@@ -161,19 +161,19 @@ img_emb = clip.encode_image(test_image)
 predicted_label = labels[argmax(img_emb @ text_embs.T)]
 ```
 
-CLIP 把"分类问题"变成了"文本检索问题"。
+CLIP 借此把过去的分类问题，顺手改写成了一个文本检索问题。
 
-**应用 2：图像生成的"评分函数"**
+**应用 2：图像生成的“评分函数”**
 
-Diffusion model 怎么知道"生成的图像是否符合 prompt"？用 CLIP：把生成的图像和 prompt 各自编码，看相似度。这是 DALL-E、Stable Diffusion 早期的核心机制。
+扩散模型要判断新生成的画面是否贴合输入的提示词，靠的就是 CLIP：把生成的图像与文本 prompt 各自编码成向量，直接比对两者的相似度。早期的 DALL-E 与 Stable Diffusion，骨子里仰仗的正是这套打分机制。
 
 **应用 3：VLM 的视觉编码器**
 
-很多 VLM 直接用 CLIP 的 vision tower 作为图像编码器。因为 CLIP 已经学到了"图像里的概念"——和文本对齐过的，这正是 VLM 需要的。
+许多 VLM 会直接拿 CLIP 的 vision tower 充当图像编码器。原因很简单，CLIP 早就提前学会了捕捉画面里的各种概念，而且这些视觉概念已经跟文本紧紧对齐，恰好省去了 VLM 最头疼的一道工序。
 
 **应用 4：检索（image search、text-to-image search）**
 
-把所有图像和查询文本都编码到同一个空间，向量检索就能跨模态。Pinterest、Google 图像搜索、电商的"以图搜图"都用类似机制。
+把海量图像和搜索查询都投射到同一个空间之后，向量检索便能毫无阻碍地跨越模态。无论是 Pinterest、Google 图像搜索，还是电商平台里常见的以图搜图，底层都在运转着极为相似的逻辑。
 
 ### 共享语义空间的直觉
 
@@ -193,9 +193,9 @@ flowchart TD
     end
 ```
 
-CLIP 训练完后，"图片 embedding" 和"对应文字描述 embedding" 不是简单地相似——它们几乎重合。这意味着：在这个空间里，**模态的边界被消解了**。"cat" 这个概念，不管是用图片还是文字表达，对应的位置是同一个。
+当 CLIP 完成训练，一幅画面所产出的 embedding 与它对应的文字描述 embedding 之间，已经不单单是数值上的近似，而是几乎叠在了一起。在这个空间深处，模态之间的硬性边界消解了。无论是一张猫的照片还是敲下的 “cat”，它们在数学表征上指向的都是同一个坐标。
 
-所有现代多模态模型都在用这个洞察。
+今天所有风头正盛的现代多模态模型，无一例外都在享用着这一份洞察带来的红利。
 
 ---
 
@@ -203,29 +203,29 @@ CLIP 训练完后，"图片 embedding" 和"对应文字描述 embedding" 不是�
 
 ### 一个看似自然的想法
 
-既然图像可以变成 token 序列，那生成图像不就和生成文本一样吗？让 LLM 一个 token 一个 token 地预测，最后把 token 序列还原成图像。
+既然图像能切成一串 token，最直接的念头就是照着写文章的办法画画：让 LLM 一个接一个地预测 token，最后把整条序列还原成画面。
 
-这条路确实有人走（DALL-E 1、Parti），但**目前主流的图像生成不是这样**。原因要从图像的特殊性说起。
+这条路确实有人走过，DALL-E 1 和 Parti 都试过这么做，只是眼下主流的图像生成并没有选它。原因还要落到图像本身的特殊性上。
 
 ### 图像 token 的特殊性
 
-文本 token 有几个性质：
-- **离散**：只有有限个 vocab
-- **顺序明确**：从左到右
-- **每个 token 信息量大**：一个 token = 一个词
+文本 token 身上有几条很清楚的性质：
+- **离散**：词表（vocab）的大小是固定的，选哪个就是哪个。
+- **顺序明确**：天生排着队，从左往右一路展开。
+- **每个 token 信息量大**：一个 token 往往对应一个词，单拎出来也有实在的意思。
 
-图像 token 不太一样：
-- **可以是离散的**（用 VQ-VAE 量化）也可以是连续的
-- **顺序是任意约定的**（光栅扫描、Z-curve...）
-- **每个 token 信息量小**：一个 patch 只有几个像素，离开周围 patch 没多少意义
+图像 token 这边则是另一套模样：
+- **可以是离散的**：能用 VQ-VAE 量化出来，也可以干脆保持连续。
+- **顺序是任意约定的**：不管是光栅扫描还是 Z-curve，怎么排全凭人定。
+- **每个 token 信息量小**：一个 patch 拢共就几个像素，离开周围的邻居单看，几乎说明不了什么。
 
-更要命的是：**图像的依赖结构是二维的、全局的**。一个像素和它上下左右的所有像素都强相关；一个图像的左上角和右下角也常常存在长程依赖（比如对称性）。
+更麻烦的还在后头：图像的依赖结构天然是二维且全局的。任何一个像素，都跟挨着它的上下左右紧紧咬在一起；哪怕隔着整张画面的左上角和右下角，也常常因为对称这类全局结构而相互牵扯。
 
-自回归地从左上扫到右下，会破坏这种二维全局结构——前面生成的内容固定后，后面生成的没法回头修。
+按照自回归的办法从左上角一路扫到右下角，这种二维的全局结构就被打碎了。前面落下的内容一旦定死，后头生成的部分再也没法回头修整。
 
-### Diffusion：从噪声里"显影"
+### Diffusion：从噪声里“显影”
 
-主流的图像生成走的是另一条路：**diffusion**。
+主流的图像生成走的是另一条截然不同的路：**diffusion**。
 
 ```mermaid
 flowchart LR
@@ -243,14 +243,14 @@ flowchart LR
     style N fill:#ffcdd2
 ```
 
-直觉解释：
+直觉上可以这么理解：
 
-1. **训练时**：拿干净的图像，逐步加噪声，训练一个网络学会"看到 t 步的噪声图，预测 t-1 步的图"
-2. **生成时**：从纯噪声开始，反复调用这个网络，逐步去噪，最终得到清晰图像
+1. **训练时**：找来干净的原图，一步步往上添噪声，训练网络学会“看着第 t 步满是噪点的图，推算出第 t-1 步原本的模样”。
+2. **生成时**：从纯粹的随机噪声出发，反过来一遍遍调用这个网络去噪，一层层把清晰的画面还原出来。
 
-整个生成过程是**全局-到-全局**的：每一步去噪都看完整张图、修改完整张图。这天然适合图像的二维全局结构。
+整个生成过程是**全局到全局**的：去噪的每一个步骤，模型都在端详整张图，也都在修改整张图。这种步调天然契合图像本身的二维全局结构。
 
-`text-to-image` 的实现就是把文本 prompt 编码（用 CLIP 或类似模型），作为去噪网络的条件输入：
+要把这套逻辑做成 `text-to-image`，核心就在于用 CLIP 或类似模型把文本 prompt 编码，作为额外的条件喂给去噪网络：
 
 ```python
 def text_to_image(prompt, n_steps=50):
@@ -263,22 +263,22 @@ def text_to_image(prompt, n_steps=50):
 
 ### DiT：把 Transformer 用进 Diffusion
 
-早期的 diffusion 用 U-Net 做去噪网络。最近的趋势是用 Transformer，称为 **DiT (Diffusion Transformer)**（Peebles & Xie, 2022, [_Scalable Diffusion Models with Transformers_](https://arxiv.org/abs/2212.09748)）。
+早期的 diffusion 多半用 U-Net 做去噪网络。近来的风向则是换上 Transformer，这套架构被称为 **DiT (Diffusion Transformer)**（Peebles & Xie, 2022, [_Scalable Diffusion Models with Transformers_](https://arxiv.org/abs/2212.09748)）。
 
-DiT 的好处：
-- 和 LLM 用同样的架构 → 能吃 transformer 的所有 scaling 经验
-- 支持 attention → 长程依赖处理得更好
-- 可以扩展到视频（在时间维度上加 attention）
+DiT 带来的好处很实在：
+- 架构与 LLM 彻底看齐，大模型在 scaling 上积累的工程经验，它可以全盘接过来。
+- 借着 attention 机制，画面不同位置之间的长程依赖能处理得更好。
+- 只要沿着时间轴多加一层 attention，整套结构就能顺手延伸到视频。
 
-OpenAI 的 Sora、Stability AI 的 Stable Diffusion 3、Google 的 Imagen 3 都用了 DiT 架构。
+OpenAI 的 Sora、Stability AI 的 Stable Diffusion 3、Google 的 Imagen 3，背后选的都是 DiT 架构。
 
-> **关键趋势**：架构上，文本生成（autoregressive transformer）和图像生成（diffusion transformer）正在收敛——都是 transformer，差别在训练目标。
+> **关键趋势**：从架构上看，文本生成（autoregressive transformer）和图像生成（diffusion transformer）正在快速合流。它们底子里都是 Transformer，真正的差别不过是训练目标不同。
 
 ### Autoregressive 图像生成的回归
 
-最近也有"复活"自回归图像生成的工作（如 LlamaGen、Anthropic 的某些实验、Google 的 Parti 后续）。它们用更聪明的 tokenize 方法（VQ-VAE 的改进），让 next-token prediction 在图像上效果接近 diffusion。
+近来也有不少工作尝试“复活”自回归路线，像 LlamaGen、Anthropic 的一些实验，还有 Google 对 Parti 的后续探索。他们靠着更精细的 tokenize 手法改动 VQ-VAE，让图像上的 next-token prediction 做到了逼近 diffusion 的水准。
 
-哪条路最终胜出还在博弈中。但工程上你今天最常打交道的，仍然是 diffusion。
+两条路线谁能笑到最后，眼下胜负未分。可如果单看现在的工程实践，每天跟你打交道最多的，依然是 diffusion。
 
 ---
 
@@ -286,7 +286,7 @@ OpenAI 的 Sora、Stability AI 的 Stable Diffusion 3、Google 的 Imagen 3 都�
 
 ### 听：Whisper
 
-OpenAI 的 Whisper（2022, [_Robust Speech Recognition via Large-Scale Weak Supervision_](https://arxiv.org/abs/2212.04356)）是开源 ASR (Automatic Speech Recognition) 的事实标准。它的设计也很 transformer：
+OpenAI 拿出来的 Whisper（2022, [_Robust Speech Recognition via Large-Scale Weak Supervision_](https://arxiv.org/abs/2212.04356)），如今是开源 ASR (Automatic Speech Recognition) 领域公认的事实标准。它的设计也完完全全是标准的 Transformer 味道：
 
 ```mermaid
 flowchart LR
@@ -299,20 +299,20 @@ flowchart LR
     style Hid fill:#c8e6c9
 ```
 
-关键点：
-- 输入不是原始波形，而是**梅尔频谱图**（mel-spectrogram）——一种把音频变成"频率随时间变化"的 2D 表示
-- 频谱图被切成时间块，每块当一个 token（类似 ViT 的 patch）
-- Encoder-Decoder 架构（少见——大部分现代 LLM 是 decoder-only），decoder 输出文本 token
+这里头有几处设计很关键：
+- 送进模型的不是原始波形，而是**梅尔频谱图**（mel-spectrogram），也就是把声音信号转成“频率随时间推移”的 2D 图像表达。
+- 频谱图顺着时间切成小块，每一小段当成一个 token，做法就像 ViT 处理图像 patch 那样。
+- 整体沿用 Encoder-Decoder 架构。如今多数大语言模型都走 decoder-only 路线，它算是个少见的例外，最终由 decoder 逐字输出文本 token。
 
-Whisper 的训练数据：从互联网爬的 68 万小时多语言音频 + 字幕。规模驱动了它的鲁棒性——它能处理各种口音、背景噪声、专业术语。
+Whisper 吃下的训练料子，是从互联网上搜集来的 68 万小时多语言音频与配套字幕。正是庞大的数据规模撑起了它的鲁棒性，让它在面对各路口音、杂乱背景音与生僻专业术语时，依然辨认得很稳。
 
 ### 说：TTS 的两种思路
 
-Text-to-Speech (TTS) 的目标反过来：文本 → 音频。
+Text-to-Speech (TTS) 要做的事情刚好反了过来：输入文本，输出音频。
 
 **思路 1：tokenize 音频，然后 next-token prediction**
 
-代表作：Tortoise TTS、Bark、Meta 的 Voicebox、Anthropic 的某些实验。
+这条路上的代表作不少：Tortoise TTS、Bark、Meta 的 Voicebox，还有 Anthropic 内部的一些探索。
 
 ```python
 # 用一个 audio tokenizer（如 EnCodec、SoundStream）把音频切成离散 token
@@ -328,21 +328,21 @@ audio = audio_tokenizer.decode(generated_audio_tokens)
 
 **思路 2：直接生成声学特征 + vocoder**
 
-代表：Tacotron、FastSpeech 系列。
+早先的 Tacotron 和 FastSpeech 系列，走的就是这个派系。
 
 ```
 text → Acoustic Model → mel-spectrogram → Vocoder → 波形
 ```
 
-第一种思路更现代、更接近"统一架构"的方向；第二种更传统但工程成熟。
+第一种思路更合乎当下追求“统一架构”的心思；第二种尽管老派，但在工程里摸爬滚打多年，极为成熟。
 
-近期的 GPT-4o voice、Gemini Live 走的是更激进的路线：**端到端音频对话**——音频输入 → LLM 直接处理 → 音频输出，中间没有"文本"中转。这避免了"文本中转损失情感、节奏、停顿"的问题。
+到了 GPT-4o voice 与 Gemini Live，步子迈得更加彻底，直接押注**端到端音频对话**：音频输入交由 LLM 直接处理并输出音频，中间完全甩掉了“文本”这个中转站。过去经由文本中转时丢掉的情感、语气节奏和微妙停顿，终于能在模型里完整保留下来。
 
 ---
 
 ## 14.5 视频：最贵的模态
 
-视频可以理解为"图像 + 时间维度"。Tokenize 的思路是 3D patches：
+视频无非就是挂上了时间轴的图像。把它切成 token 的核心思路，是做成一个个 3D patches：
 
 ```mermaid
 flowchart LR
@@ -352,22 +352,22 @@ flowchart LR
     style Tok fill:#fff9c4
 ```
 
-数量爆炸的问题：一个 5 秒、24fps、1024×1024 的视频，按 8×16×16 的 patch 切，token 数量是：
+但这么做立刻会撞上一堵墙：token 数量会当场失考。拿一段 5 秒长、24fps、1024×1024 分辨率的视频来说，要是按 8×16×16 的 patch 往下切，总共会切出这么多 token：
 
 ```
 (5*24/8) × (1024/16) × (1024/16) = 15 × 64 × 64 ≈ 60000 tokens
 ```
 
-一个 1 分钟的视频就是百万 token 级别。这是为什么视频生成（Sora、Veo、Kling、Runway）极度昂贵——每一秒视频都是巨大的 attention 计算。
+短短 1 分钟的视频，token 总量就会直接冲到百万量级。这也解释了为什么 Sora、Veo、Kling、Runway 这些视频生成模型贵得令人咋舌：屏幕上闪过的每一秒画面，背后全都是沉重无比的 attention 算力开销。
 
 ### Sora 的核心思路
 
-OpenAI 的 Sora（2024）应用了 DiT + 3D patches + 大规模训练：
+OpenAI 在 2024 年拿出来的 Sora，把 DiT、3D patches 与大规模训练揉在了一起：
 
-1. **统一表示**：图像、视频都被表示成"时空 patch"序列（图像 = 单帧的退化情形）
-2. **DiT 架构**：在时空 patch 上做 diffusion
-3. **VAE 压缩**：先把视频压缩到一个 latent space（节省计算），diffusion 在 latent 里做
-4. **海量训练数据**：网页视频 + 合成（其他模型生成的）字幕
+1. **统一表示**：图像和视频都被统一拆解成“时空 patch”序列，单张画面无非是只有一帧的特殊情况。
+2. **DiT 架构**：去噪扩散的全过程，老老实实铺在这些时空 patch 上运行。
+3. **VAE 压缩**：为了省下宝贵的算力，先用 VAE 把原始视频压进 latent space，后续的 diffusion 全在潜空间里完成。
+4. **海量训练数据**：网页上搜罗来的海量视频，搭配由其他模型生成的合成字幕，构成了庞大的训练集。
 
 ```mermaid
 flowchart LR
@@ -382,12 +382,12 @@ flowchart LR
 
 **目前视频生成的工程现实**：
 
-- 几秒视频生成需要数十秒到几分钟
-- 高分辨率成本极高（一段高清视频生成可能花几美元 API 成本）
-- 物理一致性还是挑战（液体、布料、人脸长时间一致性）
-- 长视频（>1 分钟）质量退化明显
+- 生成短短几秒钟的片段，在后台往往要耗费数十秒乃至数分钟。
+- 追求高分辨率代价高昂，单次生成一段高清视频就可能花掉数美元的 API 成本。
+- 物理规律的一致性依然是个难题，液体、布料或是人脸特征，时间稍长便难以维持一致。
+- 只要视频长度超过 1 分钟，画面质量就会出现肉眼可见的退化。
 
-视频是"最贵的模态、最大的机会"——市场需求极大（影视、广告、教育、游戏），但技术尚未成熟到大规模应用。
+视频无愧于“最贵的模态，也是最大的机会”这个评价。影视、广告、教育和游戏的需求摆在眼前，市场胃口极大，只是技术本身还没有成熟到足以支撑大规模应用的火候。
 
 ---
 
@@ -395,23 +395,23 @@ flowchart LR
 
 ### 趋势
 
-2024 年开始的趋势：**单一模型同时处理所有模态**——不是"文本模型 + 视觉模型 + 音频模型"组合，而是从训练阶段就把所有模态混在一起。
+从 2024 年开始，整个技术路线出现了一个清晰的转向：行业不再热衷于把文本、视觉和音频这几套独立模型拼成一条流水线，而是从预训练的第一天起，就用**单一模型**同时吞下所有模态的数据。输入不管是什么，都在同一个网络里消化。
 
-代表：GPT-4o（OpenAI）、Gemini（Google）、Claude（Anthropic 的视觉支持）、Llama 3.2 vision、Qwen-VL 系列。
+走在这条路线前列的代表很明确：OpenAI 的 GPT-4o、Google 的 Gemini、Anthropic 加入视觉支持的 Claude，开源阵营里的 Llama 3.2 vision，还有 Qwen-VL 系列。
 
 ### 为什么 omni 是趋势
 
 **好处 1：模态间知识迁移**
 
-如果模型同时学过"猫的图片"、"猫的描述文字"、"猫叫的录音"，它对"猫"这个概念的理解会比单模态模型深。
+当一个模型在训练时看过了猫的照片，读过了描写猫的文字，也听过了真实的猫叫声，它对“猫”这个概念所建立的理解，自然要比只接触过单一模态的模型深刻得多。
 
 **好处 2：跨模态任务变得自然**
 
-"听一段音频，看一张相关图片，写一段文字总结" —— omni 模型可以一次完成，不需要中间转换。
+听一段录音，看一张配套照片，顺手写出一小段文字总结：这类过去需要多级流水线倒腾的任务，全模态模型在一次前向推理里就能跑完，中间不需要任何格式转换。
 
 **好处 3：更少的模型，更简单的部署**
 
-一个模型、一套权重、一个 API 就能搞定多模态需求。
+只靠一个模型、一套权重、一个 API 入口，就能应对过去需要部署多个系统才能处理的多模态需求。
 
 ### Omni 模型的架构
 
@@ -436,22 +436,22 @@ flowchart LR
     style Trans fill:#c8e6c9
 ```
 
-各模态共享：
+在模型深处，各模态共享的核心组件完全一致：
 - 同一个 transformer
 - 同一套 attention
 - 同一个 hidden dim
 
-差异只在两端：
-- **输入端**：每种模态有自己的 tokenizer
-- **输出端**：根据任务选择 decoder（文本 token、音频 token、图像 latent）
+不同模态之间的差异，只留在了输入与输出的两端：
+- **输入端**：每种模态配有专门的 tokenizer，负责把原始信号切成 token。
+- **输出端**：按照具体任务挂载对应的 decoder，输出文本 token、音频 token 或是图像 latent。
 
 ### 工程上意味着什么
 
-对于应用开发者：
+落到实际的应用开发上，这种架构转变带来了几个切实的工程变化：
 
 **1. 你不需要拼模型了**
 
-以前要做"看图回答"，要么用商业 API（GPT-4V），要么自己拼 BLIP/CLIP + LLM。现在用 Claude / Gemini / GPT-4o 一个 API 就能搞定。
+过去要在业务里做“看图回答”，要么调用早期的商业 API（如 GPT-4V），要么自己在后端把 BLIP、CLIP 和大语言模型辛苦拼装起来。如今直接调用 Claude、Gemini 或 GPT-4o 的单一 API，就能直接跑通整套交互。
 
 **2. 多模态 prompt 是新技能**
 
@@ -470,22 +470,22 @@ response = client.messages.create(
 )
 ```
 
-第九章讨论的所有 prompt 工程原则都适用——只是 prompt 现在是多模态的。
+第九章梳理过的所有 prompt 工程原则在这里依然适用，差别只在于此时送入模型的 prompt 不再局限于纯文本，而是容纳了图片的多模态输入。
 
 **3. 评估也要多模态**
 
-第十二章的 eval 框架要扩展。比如 VLM 的 eval 通常包括：
+第十二章讨论过的 eval 框架必须随之扩展。衡量一个视觉语言模型（VLM）的综合表现，通常需要覆盖几个不同的评测项：
 - VQA（Visual Question Answering）准确率
 - 图像描述质量（BLEU、CIDEr、人评）
 - OCR 准确率（看图认字）
-- 图表理解
-- 多图推理
+- 图表理解能力
+- 多图推理能力
 
 ---
 
 ## 14.7 多模态系统的工程现实
 
-把这一章落到实践，几个值得知道的事：
+把多模态技术真正落到生产环境，有几条必须直面的工程现实：
 
 ### 1. 模态成本不一样
 
@@ -496,54 +496,54 @@ response = client.messages.create(
 | 视频（每分钟约 10 万 tokens） | 100000x |
 | 音频（每分钟约 1500 tokens） | 1500x |
 
-视频处理是文本的几个数量级。设计系统时这个成本结构必须放进决策。
+处理视频所消耗的开销，比纯文本高出几个数量级。在系统设计之初，这个悬殊的成本账本就必须放进每一个技术决策里。
 
 ### 2. 多模态延迟分布
 
-视频/音频生成通常是**异步**的（生成时间长，用户必须等）。这影响产品形态：
-- 文本聊天 → 实时
-- 图像生成 → 几秒等待
-- 视频生成 → 任务式，发邮件通知
+视频和音频的生成往往只能采用**异步**模式：生成耗时很长，用户无法在界面前原地等待。这种物理上的等待时间直接塑造了产品的形态：
+- 文本聊天 → 实时流式响应
+- 图像生成 → 需要等待数秒
+- 视频生成 → 任务式处理，生成完成后发送邮件通知
 
 ### 3. 多模态模型的失败模式
 
-VLM 有自己独特的失败模式（除了文本 LLM 已有的）：
+除了纯文本大语言模型已有的各种问题，视觉语言模型（VLM）还会暴露出自己特有的一批失败模式：
 
-- **OCR 不准**：看图认字仍然不可靠（尤其是手写、倾斜、低分辨率）
-- **数数不准**：图里有几个人？模型经常算错
-- **空间关系混乱**："左边的杯子" vs "右边的杯子" 经常分不清
-- **看图编故事**：被问到图中没有的东西时会编造（multimodal hallucination）
-- **看不到细节**：图像被压缩成有限的 token，细节丢失
+- **OCR 不准**：看图认字依然算不上可靠，遇到手写字体、倾斜排版或低分辨率图片时尤其容易出错。
+- **数数不准**：画面里到底有几个人，模型经常数不明白。
+- **空间关系混乱**：辨别“左边的杯子”和“右边的杯子”这类相对方位，模型常常左右不分。
+- **看图编故事**：一旦被问起图中原本不存在的物体，模型会凭空捏造（multimodal hallucination）。
+- **看不到细节**：整张图像被压缩成了有限数量的 token，微小的细节在编码阶段就丢掉了。
 
-不要假设"看图 = 像人一样看图"。多模态模型有自己的 token 化导致的盲区——和第六章讲的"strawberry 数 r"是同一类问题。
+不要想当然地以为“模型看图”就等同于“人类用眼睛看图”。多模态模型的感知完全受制于分词机制，由 token 化带来的盲区不可避免，这和第六章剖析过的“在 strawberry 里数出几个 r”属于同一类问题。
 
 ### 4. 安全和隐私的新维度
 
-- 用户上传图片可能包含 PII（脸、身份证、地址）
-- 生成的图像可能侵权（训练数据里的画家风格）
-- 深度伪造、虚假视频
-- 跨模态的 prompt injection（图片里嵌入"忽略上述指令"的文字）
+- 用户上传的图片中可能包含人脸、身份证件或具体地址等个人隐私信息（PII）。
+- 生成出来的图像可能带有训练数据中特定画家的鲜明风格，带来侵权风险。
+- 视频与音频的生成技术可能被用于深度伪造，制造虚假内容。
+- 跨模态提示词注入攻击（prompt injection），比如在图片背景里暗中嵌入一行“忽略上述指令”的文字。
 
-多模态扩大了攻击面。设计系统时要考虑。
+多模态实实在在地拓宽了系统的攻击面。在搭建系统架构时，必须把这些防范措施提前算在账里。
 
 ---
 
 ## 14.8 一个反直觉的思考：模态会不会消失？
 
-最后一节留个开放思考：
+在全章结束前，留一个值得继续推演的开放问题：
 
-**当模型足够强大时，"模态"这个概念可能本身就是一个工程方便的分类，而不是模型内部的真实区分**。
+当模型演进得足够强大之后，“模态”这个概念本身，或许只是工程师为了图方便而划出来的人工分类，在模型内部并不存在这样一道泾渭分明的界限。
 
-人脑不会把"看花的图像"和"花"这个词分成两个独立系统——它们指向同一个概念表征。我们今天给模型分"视觉编码器、文本编码器、音频编码器"，更多是工程上的便利（已有的预训练模型可以拼装），而不是模型本身需要这种分割。
+人脑在看到一朵花和读到“花”这个字时，调动的并不是两套互不相通的独立系统，两者最终指向的是同一个概念表征。今天我们在模型里划分出“视觉编码器、文本编码器、音频编码器”，更多是眼下拼装已有预训练模型的权宜之计，并不是模型自身底层必须依赖这种割裂。
 
-未来的 omni 模型可能：
-- 没有"视觉编码器"和"文本编码器"——所有输入用同一个统一的 tokenizer
-- 没有"图像生成 head"和"文本生成 head"——所有输出用同一个统一的 decoder
-- 模态成为一个**任意属性**（"输出 4K 视频"和"输出 100 字总结"是同样的指令）
+未来的全模态模型，完全可能呈现出更彻底的形态：
+- 不再区分“视觉编码器”与“文本编码器”，所有输入都由同一个统一的 tokenizer 切割分词。
+- 不再保留“图像生成 head”与“文本生成 head”，所有输出都经由同一个统一的 decoder 产出。
+- 模态彻底变成一个**任意属性**，无论要求“输出 4K 视频”还是“输出 100 字总结”，在模型看来都是形式相同的生成指令。
 
-这条路在研究上已经在走（如 Meta 的 Chameleon、Google 的 Pathways、Anthropic 的多模态实验）。
+前沿研究已经在这条路上迈出了步子，例如 Meta 的 Chameleon、Google 的 Pathways，还有 Anthropic 所做的多模态实验。
 
-如果这一步走通，第一章的论点会变得更彻底：**LLM 真的就只做一件事——预测下一个 token**。只不过 token 的含义被推到了极致。
+如果这一步彻底走通，第一章阐述过的核心论点就会显得更加纯粹：大语言模型自始至终其实只在做一件事，那就是预测下一个 token。只是到了这里，token 所涵盖的边界，被推到了语言之外更辽阔的世界。
 
 ---
 
@@ -553,26 +553,26 @@ VLM 有自己独特的失败模式（除了文本 LLM 已有的）：
 |------|------|
 | 多模态的核心思路 | 把所有模态变成 token，喂进同一个 transformer |
 | 图像怎么变 token | ViT：切成 patches，每个 patch 是一个 token |
-| CLIP 的贡献 | 教会模型"图像和文本可以共享一个语义空间" |
+| CLIP 的贡献 | 教会模型“图像和文本可以共享一个语义空间” |
 | 为什么图像生成不用 next-token | 图像的二维全局依赖结构不适合自回归；diffusion 更自然 |
 | Sora/视频生成的核心 | DiT + 3D 时空 patches + VAE 压缩 |
 | 音频识别（Whisper）的设计 | 频谱图 → patches → encoder-decoder transformer |
 | Omni model 是什么 | 一个模型同时理解和生成所有模态 |
 | 工程现实 | 模态成本差几个数量级，失败模式各有不同 |
 
-下一章是最后一章：站到当下，看 LLM 的未来——scaling 会撞墙吗？工程师这个角色会变成什么？
+下一章是全书的尾声。我们站在当下审视大语言模型的未来，聊一聊 scaling law 是否会迎来边界，还有工程师这个角色在接下来的浪潮里会经历怎样的重塑。
 
 ---
 
 ## 延伸阅读
 
-- [Dosovitskiy et al., 2020: _An Image is Worth 16x16 Words (ViT)_](https://arxiv.org/abs/2010.11929) — Vision Transformer 开山作
-- [Radford et al., 2021: _Learning Transferable Visual Models from Natural Language Supervision (CLIP)_](https://arxiv.org/abs/2103.00020) — 图文对齐基石
-- [Ho et al., 2020: _Denoising Diffusion Probabilistic Models_](https://arxiv.org/abs/2006.11239) — Diffusion 的核心论文
-- [Peebles & Xie, 2022: _Scalable Diffusion Models with Transformers (DiT)_](https://arxiv.org/abs/2212.09748) — DiT 架构
-- [Radford et al., 2022: _Whisper_](https://arxiv.org/abs/2212.04356) — 大规模弱监督语音识别
-- [OpenAI, 2024: _Video generation models as world simulators (Sora technical report)_](https://openai.com/research/video-generation-models-as-world-simulators) — Sora 技术报告
-- [Liu et al., 2023: _Visual Instruction Tuning (LLaVA)_](https://arxiv.org/abs/2304.08485) — 开源 VLM 的代表
-- [Team Chameleon (Meta), 2024: _Mixed-Modal Early-Fusion Foundation Models_](https://arxiv.org/abs/2405.09818) — 早期融合的统一模型
+- [Dosovitskiy et al., 2020: _An Image is Worth 16x16 Words (ViT)_](https://arxiv.org/abs/2010.11929)，Vision Transformer 开山作。
+- [Radford et al., 2021: _Learning Transferable Visual Models from Natural Language Supervision (CLIP)_](https://arxiv.org/abs/2103.00020)，图文对齐基石。
+- [Ho et al., 2020: _Denoising Diffusion Probabilistic Models_](https://arxiv.org/abs/2006.11239)，Diffusion 的核心论文。
+- [Peebles & Xie, 2022: _Scalable Diffusion Models with Transformers (DiT)_](https://arxiv.org/abs/2212.09748)，DiT 架构代表作。
+- [Radford et al., 2022: _Whisper_](https://arxiv.org/abs/2212.04356)，大规模弱监督语音识别。
+- [OpenAI, 2024: _Video generation models as world simulators (Sora technical report)_](https://openai.com/research/video-generation-models-as-world-simulators)，Sora 技术报告。
+- [Liu et al., 2023: _Visual Instruction Tuning (LLaVA)_](https://arxiv.org/abs/2304.08485)，开源 VLM 的代表。
+- [Team Chameleon (Meta), 2024: _Mixed-Modal Early-Fusion Foundation Models_](https://arxiv.org/abs/2405.09818)，早期融合的统一模型。
 
 [← 上一章](13-interpretability.md) | [目录](../README.md) | [下一章 →](15-future.md)
